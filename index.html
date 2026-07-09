@@ -296,7 +296,7 @@
       window.location.href = TARGET_URL;
     }
     sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
-    setTimeout(goNow, 4000);                        // 保險絲：最多等 4 秒
+    setTimeout(goNow, 3200);                        // 保險絲：最多等 4 秒
     var p = null;
     try { sfx.currentTime = 0; p = sfx.play(); } catch(e) {}
     if (p && p.catch) p.catch(function(){ setTimeout(goNow, 800); }); // 播放失敗 → 照跳
