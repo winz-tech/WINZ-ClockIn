@@ -303,7 +303,9 @@
   }
   document.addEventListener('click', launch);
   document.addEventListener('keydown', launch);
-  document.addEventListener('touchstart', launch, { passive: true });
+  document.addEventListener('touchend', launch, { passive: true });
+  // touchstart 只拿來暖身預載音效（載入合法、播放不合法）
+  document.addEventListener('touchstart', function(){ try{ sfx.load(); }catch(e){} }, { passive: true, once: true });
 </script>
 </body>
 </html>
