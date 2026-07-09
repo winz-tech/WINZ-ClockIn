@@ -194,8 +194,8 @@
 
   /* ===== 啟動轉場：glitch 撕裂 + 紅閃 ===== */
   .flash{ position:fixed; inset:0; z-index:100; pointer-events:none; opacity:0; background:var(--red); }
-  body.launching .flash{ animation:redzap 1s steps(3) forwards; }
-  @keyframes redzap{ 0%{opacity:0} 30%{opacity:.9} 50%{opacity:.1} 80%{opacity:1} 100%{opacity:1} }
+  body.launching .flash{ animation:redzap .7s steps(3) infinite; }
+  @keyframes redzap{ 0%{opacity:0} 30%{opacity:.85} 50%{opacity:.1} 80%{opacity:.95} 100%{opacity:0} }
   body.launching .stage{ animation:tear .4s steps(4); }
   @keyframes tear{
     0%{ transform:translate(0) }
@@ -287,9 +287,19 @@
   function launch() {
     if (launched) return;
     launched = true;
-    try { sfx.currentTime = 0; sfx.play(); } catch(e) {}
     document.body.classList.add('launching');
-    setTimeout(function(){ window.location.href = TARGET_URL; }, 1000);
+
+    var gone = false;
+    function goNow() {
+      if (gone) return;
+      gone = true;
+      window.location.href = TARGET_URL;
+    }
+    sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
+    setTimeout(goNow, 4000);                        // 保險絲：最多等 4 秒
+    var p = null;
+    try { sfx.currentTime = 0; p = sfx.play(); } catch(e) {}
+    if (p && p.catch) p.catch(function(){ setTimeout(goNow, 800); }); // 播放失敗 → 照跳
   }
   document.addEventListener('click', launch);
   document.addEventListener('keydown', launch);
