@@ -10,6 +10,12 @@
 <meta property="og:image" content="https://winz-tech.github.io/WINZ-ClockIn/logo.png">
 <meta property="og:url" content="https://winz-tech.github.io/WINZ-ClockIn/">
 <meta property="og:type" content="website">
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E30613">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="穎利考勤系統">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Noto+Sans+TC:wght@500;900&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -306,6 +312,14 @@
   document.addEventListener('touchend', launch, { passive: true });
   // touchstart 只拿來暖身預載音效（載入合法、播放不合法）
   document.addEventListener('touchstart', function(){ try{ sfx.load(); }catch(e){} }, { passive: true, once: true });
+  // ===== PWA Service Worker 註冊 =====
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js')
+        .then(function(){ console.log('SW 已註冊'); })
+        .catch(function(e){ console.log('SW 註冊失敗', e); });
+    });
+  }
 </script>
 </body>
 </html>
