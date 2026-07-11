@@ -1,6 +1,6 @@
 // ===== 穎利打卡 Service Worker =====
 // 更新策略：網路優先，抓不到才用快取（確保員工永遠拿到最新版）
-const CACHE = 'winz-punch-v1';   // ★改版時把 v1 改 v2、v3... 強制更新
+const CACHE = 'winz-punch-v2';   // ★改版時把 v1 改 v2、v3... 強制更新
 
 // 安裝：立即接管，不等舊的關閉
 self.addEventListener('install', function(e){
