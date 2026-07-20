@@ -289,11 +289,6 @@
   })();
 
   // 啟動：音效 + glitch 撕裂 + 紅閃 → 跳轉
-  // ★ 殼偵測:iOS PWA(standalone)/任何standalone殼/LINE內建瀏覽器
-  //   殼內走 Google 登入必 403 → 改「點擊手勢內 target=_blank」彈真瀏覽器
-  var IN_SHELL = (navigator.standalone === true)
-    || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)
-    || /Line\//i.test(navigator.userAgent);
 
   var sfx = new Audio('START.wav');
   sfx.preload = 'auto';
@@ -303,13 +298,7 @@
     launched = true;
     document.body.classList.add('launching');
 
-    if (IN_SHELL) {
-      var a = document.createElement('a');
-      a.href = TARGET_URL; a.target = '_blank'; a.rel = 'noopener';
-      document.body.appendChild(a); a.click();
-      launched = false;   // 允許再點(萬一沒彈出去)
-      return;
-    }
+
 
     var gone = false;
     function goNow() {
