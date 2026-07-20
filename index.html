@@ -304,13 +304,14 @@ if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
   fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
     .then(function(r){ return r.json(); })
     .then(function(res){
+      alert('fresh結果:ok='+(res&&res.ok)+' rc='+(res&&res.rc? res.rc.slice(0,8):'（空）'));   // ★ 偵察
       if (res && res.ok && res.rc) {
         window.location.href = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
       } else {
-        window.location.href = TARGET_URL;   // 發碼失敗→走一般（會要求登入，安全）
+        window.location.href = TARGET_URL;
       }
     })
-    .catch(function(){ window.location.href = TARGET_URL; });
+    .catch(function(e){ alert('fresh失敗:'+e); window.location.href = TARGET_URL; });
   return;
 }
 window.location.href = TARGET_URL;   // 一般進入（非續登）
