@@ -297,7 +297,7 @@ onerror="this.style.display='none'">
           } catch(e){}
         }
       })
-      .catch(function(){});
+      .catch(function(){ try{ document.body.style.opacity='1'; }catch(e){} });
   })();
 
 // 右下角即時時鐘
