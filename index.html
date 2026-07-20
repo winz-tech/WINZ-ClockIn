@@ -304,10 +304,25 @@
     document.body.classList.add('launching');
 
     if (IN_SHELL) {
-      // ★ 必須在點擊手勢「同步」開,不能等音效(iOS 擋非手勢彈窗)
-      var a = document.createElement('a');
-      a.href = TARGET_URL; a.target = '_blank'; a.rel = 'noopener';
-      document.body.appendChild(a); a.click();
+      // ★ 手勢瞬間先開空白窗(iOS 只在手勢內放行),動畫演完再導向系統
+      //   → 音效+glitch 儀式完整保留,殼照樣出
+      var w = null;
+      try { w = window.open('about:blank', '_blank'); } catch(e){}
+      var goneShell = false;
+      function goShell(){
+        if (goneShell) return; goneShell = true;
+        if (w) { try { w.location.href = TARGET_URL; } catch(e){ w = null; } }
+        if (!w) {
+          var a = document.createElement('a');
+          a.href = TARGET_URL; a.target = '_blank'; a.rel = 'noopener';
+          document.body.appendChild(a); a.click();
+        }
+      }
+      sfx.addEventListener('ended', goShell);       // 音效播完 → 導向
+      setTimeout(goShell, 3200);                     // 保險絲
+      var ps = null;
+      try { sfx.currentTime = 0; ps = sfx.play(); } catch(e){}
+      if (ps && ps.catch) ps.catch(function(){ setTimeout(goShell, 800); });
       // 殼內留提示 + 保底手點按鈕
       setTimeout(function(){
         document.body.classList.remove('launching');
