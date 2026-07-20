@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登入中…</title>
+<style>
+  body{background:#0a0a0c;margin:0;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;font-family:-apple-system,"Noto Sans TC",sans-serif}
+  .spin{width:40px;height:40px;border:3px solid #2a2a30;border-top-color:#E30613;
+    border-radius:50%;animation:s .8s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .t{color:#fff;font-size:15px;font-weight:bold}
+</style>
+</head>
+<body>
+  <div class="spin"></div>
+  <div class="t">登入中…</div>
+<script>
+(function(){
+  var p = new URLSearchParams(location.search);
+  var tok  = p.get('tok')  || '';
+  var name = p.get('name') || '';
+  var shared = p.get('shared') || '';
+  var go   = p.get('go')   || '';
+
+  if (tok && shared !== '1') {
+    try {
+      var maxage = 400*24*60*60;
+      document.cookie = 'WZ_TOKEN_CK=' + encodeURIComponent(tok) + '; max-age=' + maxage + '; path=/; SameSite=Lax';
+      if (name) document.cookie = 'WZ_NAME_CK=' + encodeURIComponent(name) + '; max-age=' + maxage + '; path=/; SameSite=Lax';
+    } catch(e){}
+  }
+
+  // ★ 種完 cookie 等 350ms 再跳,給 iOS 把 cookie 寫進硬碟的時間(不然可能還沒落地就跳走)
+  setTimeout(function(){
+    if (go) { location.replace(go); }
+    else { location.replace('https://winz-tech.github.io/WINZ-ClockIn/index.html'); }
+  }, 350);
+})();
+</script>
+</body>
+</html>
