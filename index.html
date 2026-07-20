@@ -230,6 +230,27 @@ onerror="this.style.display='none'">
 <div class="flash"></div>
 <script>
   var TARGET_URL = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
+  var EXEC_BASE  = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+  // ═══ 第二刀：冷啟動讀 cookie → 後端驗證 → 無感進系統 ═══
+  //   資安：cookie 只是鑰匙圈，放行與否永遠問後端 validate；token 被拔 → 當場清 cookie 踢登入
+  (function(){
+    function getCk(k){ try{ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }catch(e){ return ''; } }
+    function delCk(k){ try{ document.cookie = k+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){} }
+    var q = new URLSearchParams(location.search);
+    if (q.get('logout') === '1') { delCk('WZ_TOKEN_CK'); delCk('WZ_NAME_CK'); return; }   // 登出回來：清 cookie 停在接待頁
+    var tok = getCk('WZ_TOKEN_CK');
+    if (!tok) return;                                    // 沒 cookie → 正常接待頁
+    fetch(EXEC_BASE + '?page=validate&fresh=1&t=' + encodeURIComponent(tok))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok && d.rc) {
+          location.replace(EXEC_BASE + '?page=punch&rc=' + encodeURIComponent(d.rc));   // 無感進
+        } else {
+          delCk('WZ_TOKEN_CK'); delCk('WZ_NAME_CK');     // token 無效（離職/被踢）→ 清 cookie 留在登入頁
+        }
+      })
+      .catch(function(){ /* 網路失敗 → 留在接待頁手動進，不擋人 */ });
+  })();
 // 右下角即時時鐘
 function tick() {
 var d = new Date();
