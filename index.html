@@ -248,13 +248,14 @@ onerror="this.style.display='none'">
     var _ckTok = _gc('WZ_TOKEN_CK');
     if (!_ckTok) return;   // 沒 cookie → 照常顯示接待頁，等使用者手動按進入
     var _GAS = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+    // 先「只驗證」（不發 rc，避免 rc 在動畫期間過期）
     fetch(_GAS + '?page=validate&t=' + encodeURIComponent(_ckTok), { method:'GET' })
       .then(function(r){ return r.json(); })
       .then(function(res){
-        if (res && res.ok && res.rc) {
-          // ★ 驗證有效 → 續登要去的網址（帶 rc）；接待頁播完開機動畫會自動用它進系統
-          window._WZ_AUTO_GO = _GAS + '?page=punch&rc=' + encodeURIComponent(res.rc);
-          // 0.5 秒後自動觸發 launch（讓開機動畫先跑一下再進，有畫面有音效、不用手按）
+        if (res && res.ok) {
+          // ★ 驗證有效 → 記住「續登模式」+ 存 token 待跳轉前發碼；播開機動畫
+          window._WZ_AUTOLOGIN = true;
+          window._WZ_CKTOK = _ckTok;
           setTimeout(function(){ try{ launch(); }catch(e){} }, 500);
         } else {
           // 無效（離職/被踢/過期）→ 清 cookie，維持接待頁走正常登入
@@ -297,7 +298,22 @@ var gone = false;
 function goNow() {
 if (gone) return;
 gone = true;
-window.location.href = window._WZ_AUTO_GO || TARGET_URL;   // ★ 續登用帶rc網址，一般進入用原本的
+// ★ 續登模式：跳轉前「這一刻」才發 fresh rc（滿血 60 秒，絕不過期）
+if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
+  var _g = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+  fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res && res.ok && res.rc) {
+        window.location.href = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
+      } else {
+        window.location.href = TARGET_URL;   // 發碼失敗→走一般（會要求登入，安全）
+      }
+    })
+    .catch(function(){ window.location.href = TARGET_URL; });
+  return;
+}
+window.location.href = TARGET_URL;   // 一般進入（非續登）
 }
 sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
 setTimeout(goNow, 3200);                        // 保險絲：最多等 3.2 秒
