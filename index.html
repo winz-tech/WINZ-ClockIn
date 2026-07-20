@@ -304,51 +304,10 @@
     document.body.classList.add('launching');
 
     if (IN_SHELL) {
-      // ★ 手勢瞬間先開空白窗(iOS 只在手勢內放行),動畫演完再導向系統
-      //   → 音效+glitch 儀式完整保留,殼照樣出
-      var w = null;
-      try { w = window.open('about:blank', '_blank'); } catch(e){}
-      var goneShell = false;
-      function goShell(){
-        if (goneShell) return; goneShell = true;
-        if (w) { try { w.location.href = TARGET_URL; } catch(e){ w = null; } }
-        if (!w) {
-          var a = document.createElement('a');
-          a.href = TARGET_URL; a.target = '_blank'; a.rel = 'noopener';
-          document.body.appendChild(a); a.click();
-        }
-      }
-      sfx.addEventListener('ended', goShell);       // 音效播完 → 導向
-      setTimeout(goShell, 3200);                     // 保險絲
-      var ps = null;
-      try { sfx.currentTime = 0; ps = sfx.play(); } catch(e){}
-      if (ps && ps.catch) ps.catch(function(){ setTimeout(goShell, 800); });
-      // 殼內留提示 + 保底手點按鈕
-      // 殼內告示:等動畫音效「演完」才登場(goShell 3.2s 後),品牌 HUD 風
-      setTimeout(function(){
-        document.body.classList.remove('launching');
-        var tip = document.createElement('div');
-        tip.style.cssText = 'position:fixed;inset:0;z-index:999;background:#0a0a0c;'
-          + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
-          + 'gap:16px;padding:28px;text-align:center;font-family:var(--tc);'
-          + 'opacity:0;transition:opacity .5s';
-        tip.innerHTML =
-            '<div style="font-family:var(--en);font-size:10px;letter-spacing:4px;color:#6a6a72;'
-          +   'text-transform:uppercase">WINZ <b style="color:#E30613">//</b> SYSTEM LAUNCHED</div>'
-          + '<div style="width:180px;height:3px;background:repeating-linear-gradient(-45deg,'
-          +   '#E30613 0 8px,transparent 8px 16px)"></div>'
-          + '<div style="color:#fff;font-size:19px;font-weight:900;letter-spacing:4px">系統已啟動</div>'
-          + '<div style="color:#6a6a72;font-size:12.5px;line-height:1.9">已在瀏覽器為你開啟，請切換過去繼續。<br>'
-          +   '沒看到畫面？點下方重新啟動。</div>'
-          + '<a href="' + TARGET_URL + '" target="_blank" rel="noopener" '
-          +   'style="margin-top:8px;transform:skewX(-18deg);display:inline-block;'
-          +   'padding:14px 42px;background:linear-gradient(135deg,#E30613,#8f0009);'
-          +   'box-shadow:0 0 24px rgba(227,6,19,.45);color:#fff;text-decoration:none;'
-          +   'font-size:15px;font-weight:900;letter-spacing:4px">'
-          +   '<span style="display:inline-block;transform:skewX(18deg)">啟動系統 →</span></a>';
-        document.body.appendChild(tip);
-        requestAnimationFrame(function(){ tip.style.opacity = '1'; });
-      }, 3400);
+      var a = document.createElement('a');
+      a.href = TARGET_URL; a.target = '_blank'; a.rel = 'noopener';
+      document.body.appendChild(a); a.click();
+      launched = false;   // 允許再點(萬一沒彈出去)
       return;
     }
 
