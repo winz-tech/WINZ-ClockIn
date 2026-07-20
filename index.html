@@ -300,18 +300,16 @@ if (gone) return;
 gone = true;
 // ★ 續登模式：跳轉前「這一刻」才發 fresh rc（滿血 60 秒，絕不過期）
 if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
+  if (window._WZ_FRESHING) return;   // ★ fresh 只發一次,防 rc 被打兩次(iOS 事件重複)
+  window._WZ_FRESHING = true;
   var _g = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
     .then(function(r){ return r.json(); })
     .then(function(res){
-      // ★ 偵察:印完整 rc + 要跳的完整網址,先別自動跳,讓你看清楚
       if (res && res.ok && res.rc) {
-        var _target = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
-        if (confirm('rc='+res.rc+'\n\n按確定跳轉,按取消停住')) {
-          window.location.href = _target;
-        }
+        window.location.href = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
       } else {
-        alert('沒rc,走一般'); window.location.href = TARGET_URL;
+        window.location.href = TARGET_URL;
       }
     })
     .catch(function(e){ alert('fresh失敗:'+e); window.location.href = TARGET_URL; });
