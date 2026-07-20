@@ -224,19 +224,6 @@ body.launching .stage{ animation:tear .4s steps(4); }
 </head>
 <body>
 
-    <div id="wzck" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#0a0a0c;color:#fff;font-family:sans-serif;font-size:14px;padding:12px 16px;border-bottom:3px solid #E30613">
-<script>
-(function(){
-  function gc(k){var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)');return m?m.pop():'';}
-  var ck=gc('WZ_TOKEN_CK');
-  var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
-  document.write('<b style="color:'+(ck?'#3ecf6a':'#E30613')+'">'+(ck?'✅接待頁讀到cookie':'❌接待頁cookie空')+'</b>'
-    +' ｜模式:'+(sa?'PWA':'非PWA')
-    +'<br>所有cookie: '+(document.cookie||'（空）'));
-  setTimeout(function(){var e=document.getElementById('wzck');if(e)e.style.display='none';},12000);
-})();
-</script>
-</div>
 
   
 <div class="bg-grid"></div>
@@ -283,6 +270,27 @@ onerror="this.style.display='none'">
 //   不帶參數時 Google 會自動補 /u/N/（手機多帳號會導錯 → 404）
   var TARGET_URL = 'https://script.google.com/macros/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
   var TARGET_URL = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
+
+  // ★ iOS 救生艇：冷啟動讀第一方 cookie 有 token → validate → 有效帶 rc 無感進系統
+  (function(){
+    function _gc(k){ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
+    var _ckTok = _gc('WZ_TOKEN_CK');
+    if (!_ckTok) return;   // 沒 cookie → 照常顯示接待頁
+    var _GAS = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+    fetch(_GAS + '?page=validate&t=' + encodeURIComponent(_ckTok), { method:'GET' })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (res && res.ok && res.rc) {
+          location.replace(_GAS + '?page=punch&rc=' + encodeURIComponent(res.rc));
+        } else {
+          try {
+            document.cookie = 'WZ_TOKEN_CK=; max-age=0; path=/; SameSite=Lax';
+            document.cookie = 'WZ_NAME_CK=; max-age=0; path=/; SameSite=Lax';
+          } catch(e){}
+        }
+      })
+      .catch(function(){});
+  })();
 
 // 右下角即時時鐘
 function tick() {
