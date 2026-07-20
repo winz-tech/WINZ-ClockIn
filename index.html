@@ -318,7 +318,7 @@ document.addEventListener('touchstart', function(){ try{ sfx.load(); }catch(e){}
 // ===== PWA Service Worker 註冊 =====
 if ('serviceWorker' in navigator) {
 window.addEventListener('load', function(){
-navigator.serviceWorker.register('sw.js')
+navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); })
 .then(function(){ console.log('SW 已註冊'); })
 .catch(function(e){ console.log('SW 註冊失敗', e); });
 });
