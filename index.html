@@ -244,7 +244,9 @@ onerror="this.style.display='none'">
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d && d.ok && d.rc) {
-          location.replace(EXEC_BASE + '?page=punch&rc=' + encodeURIComponent(d.rc));   // 無感進
+          // ★ 乙案：不直接跳，把網址交給音效閘門（強迫聽完 START.wav 才進系統）
+          window._WZ_AUTO_URL = EXEC_BASE + '?page=punch&rc=' + encodeURIComponent(d.rc);
+          if (typeof window._wzAutoLaunch === 'function') window._wzAutoLaunch();
         } else {
           delCk('WZ_TOKEN_CK'); delCk('WZ_NAME_CK');     // token 無效（離職/被踢）→ 清 cookie 留在登入頁
         }
@@ -281,7 +283,8 @@ var gone = false;
 function goNow() {
 if (gone) return;
 gone = true;
-window.location.href = TARGET_URL;
+// ★ 乙案閘門：無感進網址(帶rc)優先，沒有才走手動 TARGET_URL
+window.location.href = window._WZ_AUTO_URL || TARGET_URL;
 }
 sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
 setTimeout(goNow, 3200);                        // 保險絲：最多等 3.2 秒
@@ -289,6 +292,8 @@ var p = null;
 try { sfx.currentTime = 0; p = sfx.play(); } catch(e) {}
 if (p && p.catch) p.catch(function(){ setTimeout(goNow, 800); }); // 播放失敗 → 照跳
 }
+// ★ 無感進自動開機：validate 成功時由第二刀呼叫（等同幫使用者按下進入）
+window._wzAutoLaunch = function(){ launch(); };
 document.addEventListener('click', launch);
 document.addEventListener('keydown', launch);
 document.addEventListener('touchend', launch, { passive: true });
