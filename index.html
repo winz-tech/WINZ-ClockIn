@@ -276,6 +276,13 @@ onerror="this.style.display='none'">
     function _gc(k){ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
     var _ckTok = _gc('WZ_TOKEN_CK');
     if (!_ckTok) return;   // 沒 cookie → 照常顯示接待頁
+    // ★ 有 cookie = 準備無感續登 → 先藏畫面+靜音,別讓接待頁閃現/音效響半聲
+    try {
+      document.documentElement.style.background = '#0a0a0c';
+      var _st = document.createElement('style');
+      _st.textContent = 'body{opacity:0 !important}';
+      document.head.appendChild(_st);
+    } catch(e){}
     var _GAS = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
     fetch(_GAS + '?page=validate&t=' + encodeURIComponent(_ckTok), { method:'GET' })
       .then(function(r){ return r.json(); })
