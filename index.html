@@ -293,6 +293,7 @@ onerror="this.style.display='none'">
           try {
             document.cookie = 'WZ_TOKEN_CK=; max-age=0; path=/; SameSite=Lax';
             document.cookie = 'WZ_NAME_CK=; max-age=0; path=/; SameSite=Lax';
+            document.body.style.opacity = '1';   // ★ 驗證失敗→還原畫面走正常登入
           } catch(e){}
         }
       })
