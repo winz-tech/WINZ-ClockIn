@@ -237,6 +237,14 @@ onerror="this.style.display='none'">
   // ★ iOS 救生艇：冷啟動讀第一方 cookie 有 token → validate → 有效「播完開機動畫再自動進系統」
   (function(){
     function _gc(k){ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
+    // ★ 登出跳回來(?logout=1)→ 清掉第一方 cookie,絕不自動續登(登出要真的登出)
+    if (/[?&]logout=1/.test(location.search)) {
+      try {
+        document.cookie = 'WZ_TOKEN_CK=; max-age=0; path=/; SameSite=Lax';
+        document.cookie = 'WZ_NAME_CK=; max-age=0; path=/; SameSite=Lax';
+      } catch(e){}
+      return;   // 停在接待頁,使用者要重新按進入 → 走登入
+    }
     var _ckTok = _gc('WZ_TOKEN_CK');
     if (!_ckTok) return;   // 沒 cookie → 照常顯示接待頁，等使用者手動按進入
     var _GAS = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
