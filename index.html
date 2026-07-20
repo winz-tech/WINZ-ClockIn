@@ -224,6 +224,21 @@ body.launching .stage{ animation:tear .4s steps(4); }
 </head>
 <body>
 
+    <div id="wzck" style="position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#0a0a0c;color:#fff;font-family:sans-serif;font-size:14px;padding:12px 16px;border-bottom:3px solid #E30613">
+<script>
+(function(){
+  function gc(k){var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)');return m?m.pop():'';}
+  var ck=gc('WZ_TOKEN_CK');
+  var sa=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  document.write('<b style="color:'+(ck?'#3ecf6a':'#E30613')+'">'+(ck?'✅接待頁讀到cookie':'❌接待頁cookie空')+'</b>'
+    +' ｜模式:'+(sa?'PWA':'非PWA')
+    +'<br>所有cookie: '+(document.cookie||'（空）'));
+  setTimeout(function(){var e=document.getElementById('wzck');if(e)e.style.display='none';},12000);
+})();
+</script>
+</div>
+
+  
 <div class="bg-grid"></div>
 <div class="slash"></div>
 <div class="slash s2"></div>
