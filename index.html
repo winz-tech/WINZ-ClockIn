@@ -304,11 +304,14 @@ if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
   fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
     .then(function(r){ return r.json(); })
     .then(function(res){
-      alert('fresh結果:ok='+(res&&res.ok)+' rc='+(res&&res.rc? res.rc.slice(0,8):'（空）'));   // ★ 偵察
+      // ★ 偵察:印完整 rc + 要跳的完整網址,先別自動跳,讓你看清楚
       if (res && res.ok && res.rc) {
-        window.location.href = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
+        var _target = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
+        if (confirm('rc='+res.rc+'\n\n按確定跳轉,按取消停住')) {
+          window.location.href = _target;
+        }
       } else {
-        window.location.href = TARGET_URL;
+        alert('沒rc,走一般'); window.location.href = TARGET_URL;
       }
     })
     .catch(function(e){ alert('fresh失敗:'+e); window.location.href = TARGET_URL; });
