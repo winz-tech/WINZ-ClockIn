@@ -230,44 +230,6 @@ onerror="this.style.display='none'">
 <div class="flash"></div>
 <script>
   var TARGET_URL = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
-
-  // ★ 續登時要跳的網址（帶 rc），由第二刀填入；沒續登就維持空，走一般 TARGET_URL
-  window._WZ_AUTO_GO = '';
-
-  // ★ iOS 救生艇：冷啟動讀第一方 cookie 有 token → validate → 有效「播完開機動畫再自動進系統」
-  (function(){
-    function _gc(k){ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
-    // ★ 登出跳回來(?logout=1)→ 清掉第一方 cookie,絕不自動續登(登出要真的登出)
-    if (/[?&]logout=1/.test(location.search)) {
-      try {
-        document.cookie = 'WZ_TOKEN_CK=; max-age=0; path=/; SameSite=Lax';
-        document.cookie = 'WZ_NAME_CK=; max-age=0; path=/; SameSite=Lax';
-      } catch(e){}
-      return;   // 停在接待頁,使用者要重新按進入 → 走登入
-    }
-    var _ckTok = _gc('WZ_TOKEN_CK');
-    if (!_ckTok) return;   // 沒 cookie → 照常顯示接待頁，等使用者手動按進入
-    var _GAS = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
-    // 先「只驗證」（不發 rc，避免 rc 在動畫期間過期）
-    fetch(_GAS + '?page=validate&t=' + encodeURIComponent(_ckTok), { method:'GET' })
-      .then(function(r){ return r.json(); })
-      .then(function(res){
-        if (res && res.ok) {
-          // ★ 驗證有效 → 記住「續登模式」+ 存 token 待跳轉前發碼；播開機動畫
-          window._WZ_AUTOLOGIN = true;
-          window._WZ_CKTOK = _ckTok;
-          setTimeout(function(){ try{ launch(); }catch(e){} }, 500);
-        } else {
-          // 無效（離職/被踢/過期）→ 清 cookie，維持接待頁走正常登入
-          try {
-            document.cookie = 'WZ_TOKEN_CK=; max-age=0; path=/; SameSite=Lax';
-            document.cookie = 'WZ_NAME_CK=; max-age=0; path=/; SameSite=Lax';
-          } catch(e){}
-        }
-      })
-      .catch(function(){ /* 網路抖 → 不自動進，讓使用者手動按進入 */ });
-  })();
-
 // 右下角即時時鐘
 function tick() {
 var d = new Date();
@@ -298,26 +260,7 @@ var gone = false;
 function goNow() {
 if (gone) return;
 gone = true;
-// ★ 續登模式：跳轉前「這一刻」才發 fresh rc（滿血 60 秒，絕不過期）
-if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
-  if (window._WZ_FRESHING) return;   // ★ fresh 只發一次,防 rc 被打兩次(iOS 事件重複)
-  window._WZ_FRESHING = true;
-  var _g = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
-  fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-     if (res && res.ok && res.rc) {
-        var _u = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
-        // ★ 延遲 400ms 再跳,確保 rc 在後端完全落地(iOS fetch 跟跳轉搶快會讓 rc 半殘)
-        setTimeout(function(){ window.location.href = _u; }, 400);
-      } else {
-        window.location.href = TARGET_URL;
-      }
-    })
-    .catch(function(e){ alert('fresh失敗:'+e); window.location.href = TARGET_URL; });
-  return;
-}
-window.location.href = TARGET_URL;   // 一般進入（非續登）
+window.location.href = TARGET_URL;
 }
 sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
 setTimeout(goNow, 3200);                        // 保險絲：最多等 3.2 秒
