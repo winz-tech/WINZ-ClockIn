@@ -306,8 +306,10 @@ if (window._WZ_AUTOLOGIN && window._WZ_CKTOK) {
   fetch(_g + '?page=validate&fresh=1&t=' + encodeURIComponent(window._WZ_CKTOK), { method:'GET' })
     .then(function(r){ return r.json(); })
     .then(function(res){
-      if (res && res.ok && res.rc) {
-        window.location.href = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
+     if (res && res.ok && res.rc) {
+        var _u = _g + '?page=punch&rc=' + encodeURIComponent(res.rc);
+        // ★ 延遲 400ms 再跳,確保 rc 在後端完全落地(iOS fetch 跟跳轉搶快會讓 rc 半殘)
+        setTimeout(function(){ window.location.href = _u; }, 400);
       } else {
         window.location.href = TARGET_URL;
       }
