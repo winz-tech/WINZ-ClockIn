@@ -175,10 +175,19 @@ opacity:0; animation:rise .5s .9s forwards, blink 1.6s 1.5s ease-in-out infinite
 }
 @keyframes blink{ 0%,100%{opacity:.9} 50%{opacity:.25} }
 @keyframes rise{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:translateY(0)} }
-.flash{ position:fixed; inset:0; z-index:100; pointer-events:none; opacity:0; background:var(--red); }
-body.launching .flash{ animation:redzap .7s steps(3) infinite; }
-@keyframes redzap{ 0%{opacity:0} 30%{opacity:.85} 50%{opacity:.1} 80%{opacity:.95} 100%{opacity:0} }
-body.launching .stage{ animation:tear .4s steps(4); }
+.flash{ position:fixed; inset:0; z-index:100; pointer-events:none; opacity:0;
+  background:linear-gradient(120deg, transparent 40%, #fff 48%, #fff 52%, transparent 60%),
+             var(--red);
+  background-size:300% 100%, 100% 100%; background-position:150% 0, 0 0; }
+/* 一瞬間科技瞬閃：白光唰地斜掃過 + 極短紅脈衝，閃一次就停 */
+body.launching .flash{ animation:zap .38s cubic-bezier(.2,.8,.2,1) 1 forwards; }
+@keyframes zap{
+  0%{   opacity:0;   background-position:150% 0, 0 0; }
+  12%{  opacity:1; }                                   /* 瞬間全亮 */
+  40%{  opacity:.9;  background-position:-50% 0, 0 0; } /* 白光掃過去 */
+  100%{ opacity:0;   background-position:-50% 0, 0 0; } /* 收乾淨 */
+}
+body.launching .stage{ animation:tear .3s steps(5) 1; }
 @keyframes tear{
 0%{ transform:translate(0) }
 25%{ transform:translate(-8px, 3px) skewX(3deg) }
