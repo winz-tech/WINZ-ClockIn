@@ -104,13 +104,17 @@ position:relative; margin:10px 0 4px;
 font-weight:900; font-size:clamp(58px, 14vw, 96px);
 letter-spacing:14px; margin-right:-14px; line-height:1.1;
 opacity:0; animation:rise .5s .25s forwards;
+background:linear-gradient(180deg,#ffe27a 0%,#ffb838 45%,#ff8c1a 100%);
+-webkit-background-clip:text; background-clip:text;
+-webkit-text-fill-color:transparent; color:transparent;
+filter:drop-shadow(0 2px 12px rgba(255,170,40,.55));
 }
 .title .t{ position:relative; display:inline-block; }
 .title .t::before, .title .t::after{
 content:attr(data-txt); position:absolute; inset:0; opacity:0;
 }
-.title .t::before{ color:var(--red); }
-.title .t::after{ color:#ff2b3d; }
+.title .t::before{ color:#ffd24a; -webkit-text-fill-color:#ffd24a; }
+.title .t::after{ color:#ff9a1f; -webkit-text-fill-color:#ff9a1f; }
 .stage:hover .title .t::before, body.launching .title .t::before{
 opacity:.85; animation:glitchA .35s steps(2) infinite;
 }
@@ -121,8 +125,8 @@ opacity:.85; animation:glitchB .35s steps(2) infinite;
 @keyframes glitchB{ 0%{transform:translate(3px,-2px)} 50%{transform:translate(-2px,1px)} 100%{transform:translate(1px,-2px)} }
 .subtitle{
 font-family:var(--en); font-weight:700; font-size:14px;
-letter-spacing:10px; color:var(--red); text-transform:uppercase;
-text-shadow:0 0 12px rgba(227,6,19,.7);
+letter-spacing:10px; color:#ffb838; text-transform:uppercase;
+text-shadow:0 0 12px rgba(255,170,40,.7);
 opacity:0; animation:rise .5s .4s forwards;
 }
 .divider{
@@ -204,6 +208,17 @@ body.launching .stage{ animation:tear .3s steps(5) 1; }
 @media (prefers-reduced-motion:reduce){
 *{ animation-duration:.01s !important; animation-iteration-count:1 !important; }
 }
+/* ★ 下錢雨 */
+.moneyrain{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+.coin{ position:absolute; top:-40px; font-size:26px; opacity:0;
+  animation:coinfall linear infinite; will-change:transform,opacity;
+  filter:drop-shadow(0 2px 4px rgba(255,170,40,.5)); }
+@keyframes coinfall{
+  0%{ transform:translateY(-40px) rotate(0deg); opacity:0; }
+  10%{ opacity:1; }
+  90%{ opacity:1; }
+  100%{ transform:translateY(105vh) rotate(360deg); opacity:0; }
+}
 </style>
 </head>
 <body>
@@ -211,6 +226,7 @@ body.launching .stage{ animation:tear .3s steps(5) 1; }
 <div class="slash"></div>
 <div class="slash s2"></div>
 <div class="sweep"></div>
+<div class="moneyrain" id="moneyrain"></div>
 <div class="corner tl"></div><div class="corner tr"></div>
 <div class="corner bl"></div><div class="corner br"></div>
 <div class="hud tl"><b>WINZ</b> TECHNOLOGY</div>
@@ -238,6 +254,23 @@ onerror="this.style.display='none'">
 </div>
 <div class="flash"></div>
 <script>
+  // ★ 下錢雨：隨機產生飄落的錢幣/鈔票
+  (function(){
+    var box = document.getElementById('moneyrain');
+    if (!box) return;
+    var faces = ['💰','🪙','💵','💴','🤑','💸'];
+    var N = 18;
+    for (var i=0;i<N;i++){
+      var c = document.createElement('div');
+      c.className = 'coin';
+      c.textContent = faces[Math.floor(Math.random()*faces.length)];
+      c.style.left = (Math.random()*100) + 'vw';
+      c.style.fontSize = (18 + Math.random()*20) + 'px';
+      c.style.animationDuration = (4 + Math.random()*5) + 's';
+      c.style.animationDelay = (Math.random()*6) + 's';
+      box.appendChild(c);
+    }
+  })();
   var TARGET_URL = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
   var EXEC_BASE  = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   // ═══ 第二刀：冷啟動讀 cookie → 後端驗證 → 無感進系統 ═══
