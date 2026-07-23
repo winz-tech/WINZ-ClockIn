@@ -128,6 +128,10 @@ html.fast #welcome{ display:none; }
 .manual .lab{ display:block; transform:skewX(18deg); padding:15px 44px;
   font-family:var(--tc); font-weight:900; font-size:18px; letter-spacing:8px;
   margin-right:-8px; color:#fff; }
+/* 等待中：灰掉勸退，但仍可點（iOS 程式化跳轉會被吞，這是唯一保底路） */
+.manual.wait{ background:linear-gradient(135deg,#3a3a42,#25252b);
+  box-shadow:0 0 0 rgba(0,0,0,0), 0 6px 0 rgba(0,0,0,.4); }
+.manual.wait .lab{ color:#8a8a92; letter-spacing:6px; }
 
 /* ══════ 完整迎賓（第一次 / 登出後）══════ */
 #welcome{ position:relative; z-index:10; text-align:center; width:100%; max-width:640px;
@@ -203,7 +207,7 @@ html.fast .slash{ display:none; }
   <div class="fsub">Time Attendance</div>
   <div class="fbar" id="fastBar"><i></i></div>
   <div class="fmsg" id="fastMsg">Verifying keyring</div>
-  <a class="manual" id="fastManual" href="#" target="_top"><span class="lab">進入系統</span></a>
+  <a class="manual wait" id="fastManual" href="#" target="_top"><span class="lab">登入中</span></a>
 </div>
 
 <!-- ══ 完整迎賓 ══ -->
@@ -262,20 +266,24 @@ html.fast .slash{ display:none; }
     setTimeout(function(){ man.classList.add('show'); msg.textContent = 'Tap to continue'; }, 200);
   }
 
+  function _ready(){
+    man.classList.remove('wait');
+    man.querySelector('.lab').textContent = '進入系統';
+  }
   W._WZ_P.then(function(url){
-    if (url){ man.setAttribute('href', url); go(url); return; }
+    if (url){ man.setAttribute('href', url); _ready(); go(url); return; }
     if (url === ''){       // token 失效 → 退回完整迎賓，講清楚為什麼
       document.documentElement.className = '';
       return;
     }
     msg.className = 'fmsg warn';           // null = 網路失敗
     msg.textContent = '連線不穩，點下方直接進入';
-    man.classList.add('show');
+    _ready(); man.classList.add('show');
   });
 
   // 保底：1.6 秒還沒走 → 浮出真 <a> 大鈕
   setTimeout(function(){
-    if (!gone) man.classList.add('show');
+    if (!gone) { _ready(); man.classList.add('show'); }
   }, 1600);
 })();
 
