@@ -3,6 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- ★★ 最優先：先開連線 + 先驗證，不能被字型/CSS 擋住 ★★ -->
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="dns-prefetch" href="https://script.google.com">
+<script>
+(function(){
+  var W = window;
+  W.WZ_EXEC = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+  W.WZ_TARGET = W.WZ_EXEC + '?page=punch';
+  function ck(k){ try{ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }catch(e){ return ''; } }
+  function del(k){ try{ document.cookie = k+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){} }
+  W._wzDel = del;
+
+  if (location.search.indexOf('logout=1') > -1){
+    del('WZ_TOKEN_CK'); del('WZ_NAME_CK'); W._WZ_FAST = false; return;
+  }
+  var tok = ck('WZ_TOKEN_CK');
+  W._WZ_NAME = ck('WZ_NAME_CK');
+  if (!tok){ W._WZ_FAST = false; return; }
+
+  W._WZ_FAST = true;
+  document.documentElement.className = 'fast';   // ★ 立刻決定走哪條路，不閃畫面
+  W._WZ_P = fetch(W.WZ_EXEC + '?page=validate&fresh=1&t=' + encodeURIComponent(tok))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok && d.rc) return W.WZ_EXEC + '?page=punch&rc=' + encodeURIComponent(d.rc);
+      del('WZ_TOKEN_CK'); del('WZ_NAME_CK');
+      return '';        // '' = token 失效（離職/被踢）
+    })
+    .catch(function(){ return null; });   // null = 網路失敗，cookie 留著別清
+})();
+</script>
+
 <title>穎利科技｜打卡系統</title>
 <meta name="description" content="穎利科技考勤薪資系統">
 <meta property="og:title" content="穎利科技｜考勤薪資系統">
@@ -16,337 +49,241 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="考勤薪資">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Noto+Sans+TC:wght@500;900&display=swap" rel="stylesheet">
+
+<!-- 字型非阻塞：先 print 不套用，載完才切 all（不擋 script 執行） -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+  href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Noto+Sans+TC:wght@500;900&display=swap">
+
 <style>
 :root{
---red:      #E30613;
---red-dark: #8f0009;
---bg:       #0a0a0c;
---panel:    #121216;
---white:    #ffffff;
---gray:     #6a6a72;
---line:     rgba(255,255,255,.08);
---en: 'Chakra Petch', sans-serif;
---tc: 'Noto Sans TC', sans-serif;
+--red:#E30613; --red-dark:#8f0009; --bg:#0a0a0c; --panel:#121216;
+--white:#fff; --gray:#6a6a72; --line:rgba(255,255,255,.08);
+--en:'Chakra Petch',"Segoe UI",sans-serif;
+--tc:'Noto Sans TC',"Microsoft JhengHei",sans-serif;
 }
 *{ box-sizing:border-box; margin:0; padding:0; }
 html,body{ height:100%; }
-body{
-background:var(--bg);
-color:var(--white);
-font-family:var(--tc);
-overflow:hidden;
-display:flex; align-items:center; justify-content:center;
-}
-.bg-grid{
-position:fixed; inset:0; z-index:0;
-background-image:
-linear-gradient(var(--line) 1px, transparent 1px),
-linear-gradient(90deg, var(--line) 1px, transparent 1px);
-background-size:56px 56px;
-mask-image:radial-gradient(ellipse 90% 80% at 50% 45%, #000 30%, transparent 75%);
--webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 45%, #000 30%, transparent 75%);
-}
-.slash{
-position:fixed; z-index:1; pointer-events:none;
-width:180vmax; height:22vmin; left:50%; top:50%;
-transform:translate(-50%,-50%) rotate(-18deg);
-background:linear-gradient(90deg, transparent, rgba(227,6,19,.12) 30%, rgba(227,6,19,.2) 50%, rgba(227,6,19,.12) 70%, transparent);
-border-top:1px solid rgba(227,6,19,.35);
-border-bottom:1px solid rgba(227,6,19,.35);
-}
-.slash.s2{
-height:3px; border:none; opacity:.8;
-background:linear-gradient(90deg, transparent, var(--red), transparent);
-animation:slashPulse 3s ease-in-out infinite;
-}
-@keyframes slashPulse{ 0%,100%{opacity:.35} 50%{opacity:.9} }
-.sweep{
-position:fixed; inset:0; z-index:1; pointer-events:none;
-background:linear-gradient(180deg, transparent 0%, rgba(227,6,19,.06) 50%, transparent 100%);
-background-size:100% 300px; background-repeat:no-repeat;
-animation:sweep 5s linear infinite;
-}
-@keyframes sweep{ from{background-position:0 -300px} to{background-position:0 110vh} }
+body{ background:var(--bg); color:var(--white); font-family:var(--tc);
+  overflow:hidden; display:flex; align-items:center; justify-content:center; }
+
+/* ── 走哪條路 ── */
+#fast{ display:none; }
+html.fast #fast{ display:flex; }
+html.fast #welcome{ display:none; }
+
+/* ── 共用背景 ── */
+.bg-grid{ position:fixed; inset:0; z-index:0;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 90% 80% at 50% 45%,#000 30%,transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 45%,#000 30%,transparent 75%); }
+.corner{ position:fixed; width:26px; height:26px; z-index:2; border:2px solid var(--red); opacity:.8; }
+.corner.tl{ top:12px; left:12px; border-right:none; border-bottom:none; }
+.corner.tr{ top:12px; right:12px; border-left:none; border-bottom:none; }
+.corner.bl{ bottom:12px; left:12px; border-right:none; border-top:none; }
+.corner.br{ bottom:12px; right:12px; border-left:none; border-top:none; }
 .hud{ position:fixed; z-index:2; font-family:var(--en); font-size:10px;
-letter-spacing:2px; color:var(--gray); text-transform:uppercase; }
+  letter-spacing:2px; color:var(--gray); text-transform:uppercase; }
 .hud b{ color:var(--red); font-weight:700; }
-.hud.tl{ top:22px; left:26px; }
-.hud.tr{ top:22px; right:26px; text-align:right; }
-.hud.bl{ bottom:22px; left:26px; }
-.hud.br{ bottom:22px; right:26px; text-align:right; }
-.corner{ position:fixed; width:26px; height:26px; z-index:2;
-border:2px solid var(--red); opacity:.8; }
-.corner.tl{ top:12px; left:12px;  border-right:none; border-bottom:none; }
-.corner.tr{ top:12px; right:12px; border-left:none;  border-bottom:none; }
-.corner.bl{ bottom:12px; left:12px;  border-right:none; border-top:none; }
-.corner.br{ bottom:12px; right:12px; border-left:none;  border-top:none; }
-.stage{
-position:relative; z-index:10; text-align:center;
-width:100%; max-width:640px; padding:24px;
-display:flex; flex-direction:column; align-items:center; gap:0;
-}
-.brand{
-font-family:var(--en); font-weight:600; font-size:13px;
-letter-spacing:8px; color:var(--gray); text-transform:uppercase;
-opacity:0; animation:rise .5s .1s forwards;
-}
-.brand b{ color:var(--red); }
-.logo{
-height:64px; max-width:82vw; object-fit:contain;
-margin-bottom:14px;
-filter:drop-shadow(0 0 14px rgba(227,6,19,.5));
-opacity:0; animation:rise .5s .05s forwards;
-}
-@media (max-width:480px){ .logo{ height:48px; } }
-.title{
-position:relative; margin:10px 0 4px;
-font-weight:900; font-size:clamp(58px, 14vw, 96px);
-letter-spacing:14px; margin-right:-14px; line-height:1.1;
-opacity:0; animation:rise .5s .25s forwards;
-background:linear-gradient(180deg,#ffe27a 0%,#ffb838 45%,#ff8c1a 100%);
--webkit-background-clip:text; background-clip:text;
--webkit-text-fill-color:transparent; color:transparent;
-filter:drop-shadow(0 2px 12px rgba(255,170,40,.55));
-}
-.title .t{ position:relative; display:inline-block; }
-.title .t::before, .title .t::after{
-content:attr(data-txt); position:absolute; inset:0; opacity:0;
-}
-.title .t::before{ color:#ffd24a; -webkit-text-fill-color:#ffd24a; }
-.title .t::after{ color:#ff9a1f; -webkit-text-fill-color:#ff9a1f; }
-.stage:hover .title .t::before, body.launching .title .t::before{
-opacity:.85; animation:glitchA .35s steps(2) infinite;
-}
-.stage:hover .title .t::after, body.launching .title .t::after{
-opacity:.85; animation:glitchB .35s steps(2) infinite;
-}
-@keyframes glitchA{ 0%{transform:translate(-3px,2px)} 50%{transform:translate(2px,-1px)} 100%{transform:translate(-1px,1px)} }
-@keyframes glitchB{ 0%{transform:translate(3px,-2px)} 50%{transform:translate(-2px,1px)} 100%{transform:translate(1px,-2px)} }
-.subtitle{
-font-family:var(--en); font-weight:700; font-size:14px;
-letter-spacing:10px; color:#ffb838; text-transform:uppercase;
-text-shadow:0 0 12px rgba(255,170,40,.7);
-opacity:0; animation:rise .5s .4s forwards;
-}
-.divider{
-width:220px; height:3px; margin:34px 0 26px;
-background:repeating-linear-gradient(-45deg, var(--red) 0 8px, transparent 8px 16px);
-opacity:0; animation:rise .5s .5s forwards;
-}
-.bootlog{
-font-family:var(--en); font-size:11px; letter-spacing:2px;
-color:var(--gray); text-align:left; min-height:54px;
-text-transform:uppercase;
-opacity:0; animation:rise .5s .6s forwards;
-}
-.bootlog div{ opacity:0; }
-.bootlog .ok{ color:var(--red); font-weight:700; }
-.enter{
-margin-top:30px;
-transform:skewX(-18deg);
-background:linear-gradient(135deg, var(--red), var(--red-dark));
-border:none; cursor:pointer;
-padding:0; position:relative;
-box-shadow:0 0 24px rgba(227,6,19,.45), 0 8px 0 rgba(0,0,0,.5);
-opacity:0; animation:rise .5s .75s forwards;
-transition:transform .12s, box-shadow .12s;
-}
-.enter:hover{ transform:skewX(-18deg) translateY(-2px); box-shadow:0 0 40px rgba(227,6,19,.8), 0 10px 0 rgba(0,0,0,.5); }
-.enter:active{ transform:skewX(-18deg) translateY(2px); box-shadow:0 0 16px rgba(227,6,19,.5), 0 4px 0 rgba(0,0,0,.5); }
-.enter::before{
-content:''; position:absolute; inset:3px;
-border:1px solid rgba(255,255,255,.35); pointer-events:none;
-}
-.enter .lab{
-display:block; transform:skewX(18deg);
-padding:18px 64px;
-font-family:var(--tc); font-weight:900; font-size:22px;
-letter-spacing:10px; margin-right:-10px; color:#fff;
-}
-.enter .en{
-display:block; transform:skewX(18deg);
-font-family:var(--en); font-weight:600; font-size:10px;
-letter-spacing:6px; color:rgba(255,255,255,.7);
-padding-bottom:12px; margin-top:-10px;
-}
-.tapline{
-margin-top:22px;
-font-family:var(--en); font-size:10px; letter-spacing:4px;
-color:var(--gray); text-transform:uppercase;
-animation:blink 1.6s ease-in-out infinite;
-opacity:0; animation:rise .5s .9s forwards, blink 1.6s 1.5s ease-in-out infinite;
-}
-@keyframes blink{ 0%,100%{opacity:.9} 50%{opacity:.25} }
-@keyframes rise{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:translateY(0)} }
-.flash{ position:fixed; inset:0; z-index:100; pointer-events:none; opacity:0;
-  background:linear-gradient(120deg, transparent 40%, #fff5d6 47%, #ffd24a 50%, #fff5d6 53%, transparent 60%),
-             radial-gradient(circle at 50% 50%, rgba(255,170,40,.9), rgba(255,140,20,.7));
-  background-size:300% 100%, 100% 100%; background-position:150% 0, 0 0; }
-/* 一瞬間科技瞬閃：白光唰地斜掃過 + 極短紅脈衝，閃一次就停 */
-body.launching .flash{ animation:zap .38s cubic-bezier(.2,.8,.2,1) 1 forwards; }
-@keyframes zap{
-  0%{   opacity:0;   background-position:150% 0, 0 0; }
-  12%{  opacity:1; }                                   /* 瞬間全亮 */
-  40%{  opacity:.9;  background-position:-50% 0, 0 0; } /* 白光掃過去 */
-  100%{ opacity:0;   background-position:-50% 0, 0 0; } /* 收乾淨 */
-}
-body.launching .stage{ animation:tear .3s steps(5) 1; }
-@keyframes tear{
-0%{ transform:translate(0) }
-25%{ transform:translate(-8px, 3px) skewX(3deg) }
-50%{ transform:translate(6px, -2px) skewX(-2deg) }
-75%{ transform:translate(-4px, 1px) }
-100%{ transform:translate(0) }
-}
-@media (max-width:480px){
-.title{ letter-spacing:8px; margin-right:-8px; }
-.enter .lab{ padding:16px 44px; font-size:19px; }
-.hud{ font-size:8px; }
-.hud.bl, .hud.br{ display:none; }
-}
+.hud.tl{ top:22px; left:26px; } .hud.tr{ top:22px; right:26px; text-align:right; }
+.hud.bl{ bottom:22px; left:26px; } .hud.br{ bottom:22px; right:26px; text-align:right; }
+@media (max-width:480px){ .hud{ font-size:8px; } .hud.bl,.hud.br{ display:none; } }
+
+/* ══════ 快速通道：極簡識別卡 ══════ */
+#fast{ position:relative; z-index:10; flex-direction:column; align-items:center;
+  width:100%; max-width:420px; padding:24px; text-align:center; }
+#fast .flogo{ height:52px; max-width:70vw; object-fit:contain;
+  filter:drop-shadow(0 0 14px rgba(227,6,19,.45));
+  opacity:0; animation:fadeUp .32s .02s forwards; }
+#fast .fhi{ margin-top:22px; font-size:clamp(26px,7.5vw,36px); font-weight:900;
+  letter-spacing:2px; line-height:1.3;
+  opacity:0; animation:fadeUp .32s .08s forwards; }
+#fast .fhi b{ color:var(--red); }
+#fast .fsub{ margin-top:8px; font-family:var(--en); font-size:11px; letter-spacing:5px;
+  color:var(--gray); text-transform:uppercase;
+  opacity:0; animation:fadeUp .32s .14s forwards; }
+/* 掃描條：validate 回來就衝到底 */
+#fast .fbar{ position:relative; width:200px; height:2px; margin-top:30px;
+  background:rgba(255,255,255,.09); border-radius:2px; overflow:hidden;
+  opacity:0; animation:fadeUp .32s .18s forwards; }
+#fast .fbar i{ position:absolute; inset:0 100% 0 0; background:var(--red);
+  box-shadow:0 0 10px rgba(227,6,19,.9); border-radius:2px;
+  animation:barCreep 1.6s cubic-bezier(.25,.9,.35,1) forwards; }
+#fast .fbar.done i{ animation:none; right:0; transition:right .12s linear; }
+@keyframes barCreep{ to{ right:28%; } }
+#fast .fmsg{ margin-top:14px; font-family:var(--en); font-size:10px; letter-spacing:3px;
+  color:#4a4a52; text-transform:uppercase; min-height:14px; }
+#fast .fmsg.warn{ color:#ffb340; letter-spacing:1px; font-family:var(--tc); font-size:13px; }
+@keyframes fadeUp{ from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+/* 保底手動鈕（iOS：程式化跳轉會被吞，留手按路） */
+.manual{ display:none; margin-top:26px; text-decoration:none;
+  transform:skewX(-18deg); background:linear-gradient(135deg,var(--red),var(--red-dark));
+  box-shadow:0 0 22px rgba(227,6,19,.45), 0 6px 0 rgba(0,0,0,.5); position:relative;
+  animation:fadeUp .3s forwards; }
+.manual.show{ display:block; }
+.manual::before{ content:''; position:absolute; inset:3px;
+  border:1px solid rgba(255,255,255,.35); pointer-events:none; }
+.manual .lab{ display:block; transform:skewX(18deg); padding:15px 44px;
+  font-family:var(--tc); font-weight:900; font-size:18px; letter-spacing:8px;
+  margin-right:-8px; color:#fff; }
+
+/* ══════ 完整迎賓（第一次 / 登出後）══════ */
+#welcome{ position:relative; z-index:10; text-align:center; width:100%; max-width:640px;
+  padding:24px; display:flex; flex-direction:column; align-items:center; }
+.slash{ position:fixed; z-index:1; pointer-events:none;
+  width:180vmax; height:3px; left:50%; top:50%;
+  transform:translate(-50%,-50%) rotate(-18deg);
+  background:linear-gradient(90deg,transparent,var(--red),transparent);
+  animation:slashPulse 3s ease-in-out infinite; }
+html.fast .slash{ display:none; }
+@keyframes slashPulse{ 0%,100%{opacity:.3} 50%{opacity:.85} }
+#welcome .logo{ height:60px; max-width:82vw; object-fit:contain; margin-bottom:14px;
+  filter:drop-shadow(0 0 14px rgba(227,6,19,.5)); opacity:0; animation:fadeUp .4s .04s forwards; }
+@media (max-width:480px){ #welcome .logo{ height:46px; } }
+#welcome .brand{ font-family:var(--en); font-weight:600; font-size:13px; letter-spacing:8px;
+  color:var(--gray); text-transform:uppercase; opacity:0; animation:fadeUp .4s .1s forwards; }
+#welcome .title{ margin:10px 0 4px; font-weight:900;
+  font-size:clamp(52px,13vw,88px); letter-spacing:14px; margin-right:-14px; line-height:1.1;
+  background:linear-gradient(180deg,#ffe27a 0%,#ffb838 45%,#ff8c1a 100%);
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:transparent;
+  filter:drop-shadow(0 2px 12px rgba(255,170,40,.5));
+  opacity:0; animation:fadeUp .4s .18s forwards; }
+@media (max-width:480px){ #welcome .title{ letter-spacing:8px; margin-right:-8px; } }
+#welcome .subtitle{ font-family:var(--en); font-weight:700; font-size:13px; letter-spacing:9px;
+  color:#ffb838; text-transform:uppercase; text-shadow:0 0 12px rgba(255,170,40,.6);
+  opacity:0; animation:fadeUp .4s .24s forwards; }
+#welcome .divider{ width:210px; height:3px; margin:30px 0 24px;
+  background:repeating-linear-gradient(-45deg,var(--red) 0 8px,transparent 8px 16px);
+  opacity:0; animation:fadeUp .4s .3s forwards; }
+#welcome .bootlog{ font-family:var(--en); font-size:11px; letter-spacing:2px; color:var(--gray);
+  text-align:left; text-transform:uppercase; opacity:0; animation:fadeUp .4s .36s forwards; }
+#welcome .bootlog .ok{ color:var(--red); font-weight:700; }
+#welcome .enter{ margin-top:30px; text-decoration:none; transform:skewX(-18deg);
+  background:linear-gradient(135deg,var(--red),var(--red-dark)); position:relative;
+  box-shadow:0 0 24px rgba(227,6,19,.45), 0 8px 0 rgba(0,0,0,.5);
+  opacity:0; animation:fadeUp .4s .44s forwards;
+  transition:transform .12s, box-shadow .12s; }
+#welcome .enter:hover{ transform:skewX(-18deg) translateY(-2px);
+  box-shadow:0 0 38px rgba(227,6,19,.8), 0 10px 0 rgba(0,0,0,.5); }
+#welcome .enter:active{ transform:skewX(-18deg) translateY(2px);
+  box-shadow:0 0 16px rgba(227,6,19,.5), 0 4px 0 rgba(0,0,0,.5); }
+#welcome .enter::before{ content:''; position:absolute; inset:3px;
+  border:1px solid rgba(255,255,255,.35); pointer-events:none; }
+#welcome .enter .lab{ display:block; transform:skewX(18deg); padding:18px 60px;
+  font-family:var(--tc); font-weight:900; font-size:21px; letter-spacing:10px;
+  margin-right:-10px; color:#fff; }
+#welcome .enter .en{ display:block; transform:skewX(18deg); font-family:var(--en);
+  font-weight:600; font-size:10px; letter-spacing:6px; color:rgba(255,255,255,.7);
+  padding-bottom:12px; margin-top:-10px; }
+@media (max-width:480px){ #welcome .enter .lab{ padding:16px 40px; font-size:18px; } }
+
 @media (prefers-reduced-motion:reduce){
-*{ animation-duration:.01s !important; animation-iteration-count:1 !important; }
-}
-/* ★ 下錢雨 */
-.moneyrain{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
-.coin{ position:absolute; top:-40px; font-size:26px; opacity:0;
-  animation:coinfall linear infinite; will-change:transform,opacity;
-  filter:drop-shadow(0 2px 4px rgba(255,170,40,.5)); }
-@keyframes coinfall{
-  0%{ transform:translateY(-40px) rotate(0deg); opacity:0; }
-  10%{ opacity:1; }
-  90%{ opacity:1; }
-  100%{ transform:translateY(105vh) rotate(360deg); opacity:0; }
+  *{ animation-duration:.01s !important; animation-iteration-count:1 !important; }
 }
 </style>
 </head>
 <body>
+
 <div class="bg-grid"></div>
 <div class="slash"></div>
-<div class="slash s2"></div>
-<div class="sweep"></div>
-<div class="moneyrain" id="moneyrain"></div>
 <div class="corner tl"></div><div class="corner tr"></div>
 <div class="corner bl"></div><div class="corner br"></div>
 <div class="hud tl"><b>WINZ</b> TECHNOLOGY</div>
 <div class="hud tr">SYS.PUNCH <b>v2026</b></div>
 <div class="hud bl">GPS FENCE <b>150M</b> // SERVER TIME SYNC</div>
 <div class="hud br" id="hudClock">--:--:--</div>
-<div class="stage" id="stage">
-<img class="logo" alt="穎利科技 WINZ"
-src="logo.png"
-onerror="this.style.display='none'">
-<div class="brand">WINZ <b>//</b> ERP SUITE</div>
-<h1 class="title"><span class="t" data-txt="打卡系統">打卡系統</span></h1>
-<div class="subtitle">Time Attendance System</div>
-<div class="divider"></div>
-<div class="bootlog" id="bootlog">
-<div>&gt; AUTH MODULE ......... <span class="ok">READY</span></div>
-<div>&gt; GPS FENCE 150M ...... <span class="ok">ARMED</span></div>
-<div>&gt; SERVER TIME ......... <span class="ok">SYNCED</span></div>
+
+<!-- ══ 快速通道 ══ -->
+<div id="fast">
+  <img class="flogo" src="logo.png" alt="穎利科技 WINZ" onerror="this.style.display='none'">
+  <div class="fhi" id="fastHi">午安</div>
+  <div class="fsub">Time Attendance</div>
+  <div class="fbar" id="fastBar"><i></i></div>
+  <div class="fmsg" id="fastMsg">Verifying keyring</div>
+  <a class="manual" id="fastManual" href="#" target="_top"><span class="lab">進入系統</span></a>
 </div>
-<button class="enter" id="btnEnter">
-<span class="lab">進入系統</span>
-<span class="en">// PRESS TO ENTER //</span>
-</button>
-<div class="tapline">Tap anywhere to launch</div>
+
+<!-- ══ 完整迎賓 ══ -->
+<div id="welcome">
+  <img class="logo" src="logo.png" alt="穎利科技 WINZ" onerror="this.style.display='none'">
+  <div class="brand">WINZ // ERP SUITE</div>
+  <h1 class="title">打卡系統</h1>
+  <div class="subtitle">Time Attendance System</div>
+  <div class="divider"></div>
+  <div class="bootlog">
+    <div>&gt; AUTH MODULE ......... <span class="ok">READY</span></div>
+    <div>&gt; GPS FENCE 150M ...... <span class="ok">ARMED</span></div>
+    <div>&gt; SERVER TIME ......... <span class="ok">SYNCED</span></div>
+  </div>
+  <a class="enter" id="btnEnter" href="#" target="_top">
+    <span class="lab">進入系統</span>
+    <span class="en">// PRESS TO ENTER //</span>
+  </a>
 </div>
-<div class="flash"></div>
+
 <script>
-  // ★ 下錢雨：隨機產生飄落的錢幣/鈔票
-  (function(){
-    var box = document.getElementById('moneyrain');
-    if (!box) return;
-    var faces = ['💰','🪙','💵','💴','🤑','💸'];
-    var N = 18;
-    for (var i=0;i<N;i++){
-      var c = document.createElement('div');
-      c.className = 'coin';
-      c.textContent = faces[Math.floor(Math.random()*faces.length)];
-      c.style.left = (Math.random()*100) + 'vw';
-      c.style.fontSize = (18 + Math.random()*20) + 'px';
-      c.style.animationDuration = (4 + Math.random()*5) + 's';
-      c.style.animationDelay = (Math.random()*6) + 's';
-      box.appendChild(c);
-    }
-  })();
-  var TARGET_URL = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch';
-  var EXEC_BASE  = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
-  // ═══ 第二刀：冷啟動讀 cookie → 後端驗證 → 無感進系統 ═══
-  //   資安：cookie 只是鑰匙圈，放行與否永遠問後端 validate；token 被拔 → 當場清 cookie 踢登入
-  (function(){
-    function getCk(k){ try{ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }catch(e){ return ''; } }
-    function delCk(k){ try{ document.cookie = k+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){} }
-    var q = new URLSearchParams(location.search);
-    if (q.get('logout') === '1') { delCk('WZ_TOKEN_CK'); delCk('WZ_NAME_CK'); return; }   // 登出回來：清 cookie 停在接待頁
-    var tok = getCk('WZ_TOKEN_CK');
-    if (!tok) return;                                    // 沒 cookie → 正常接待頁
-    fetch(EXEC_BASE + '?page=validate&fresh=1&t=' + encodeURIComponent(tok))
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d && d.ok && d.rc) {
-          // ★ 乙案：不直接跳，把網址交給音效閘門（強迫聽完 START.wav 才進系統）
-          window._WZ_AUTO_URL = EXEC_BASE + '?page=punch&rc=' + encodeURIComponent(d.rc);
-          if (typeof window._wzAutoLaunch === 'function') window._wzAutoLaunch();
-        } else {
-          delCk('WZ_TOKEN_CK'); delCk('WZ_NAME_CK');     // token 無效（離職/被踢）→ 清 cookie 留在登入頁
-        }
-      })
-      .catch(function(){ /* 網路失敗 → 留在接待頁手動進，不擋人 */ });
-  })();
-// 右下角即時時鐘
-function tick() {
-var d = new Date();
-var p = function(n){ return (n < 10 ? '0' : '') + n; };
-document.getElementById('hudClock').textContent =
-p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-}
-tick(); setInterval(tick, 1000);
-// 開機序列逐行浮現
 (function(){
-var rows = document.querySelectorAll('#bootlog div');
-rows.forEach(function(r, i) {
-setTimeout(function(){
-r.style.transition = 'opacity .2s';
-r.style.opacity = 1;
-}, 900 + i * 280);
-});
+  var W = window;
+
+  // 時鐘
+  function tick(){
+    var d = new Date(), p = function(n){ return (n<10?'0':'')+n; };
+    var el = document.getElementById('hudClock');
+    if (el) el.textContent = p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  }
+  tick(); setInterval(tick, 1000);
+
+  // 手動路：真 <a>，iOS 靠真手勢導航（不用任何 JS 跳轉）
+  document.getElementById('btnEnter').setAttribute('href', W.WZ_TARGET);
+
+  if (!W._WZ_FAST) return;   // 沒 cookie → 到此為止，看完整迎賓頁
+
+  // ── 快速通道 ──
+  var hi = document.getElementById('fastHi');
+  var bar = document.getElementById('fastBar');
+  var msg = document.getElementById('fastMsg');
+  var man = document.getElementById('fastManual');
+  var gone = false;
+
+  var h = new Date().getHours();
+  var g = h < 12 ? '早安' : (h < 18 ? '午安' : '晚安');
+  hi.innerHTML = W._WZ_NAME ? (g + '，<b>' + String(W._WZ_NAME).replace(/[<>&]/g,'') + '</b>') : g;
+
+  man.setAttribute('href', W.WZ_TARGET);   // 先給保底網址，validate 回來會換成帶 rc 的
+
+  function go(url){
+    if (gone) return; gone = true;
+    bar.className = 'fbar done';
+    location.replace(url);
+    // iOS PWA 可能吞掉 replace → 200ms 後還在就把大鈕推出來（坑B：蘋果留手按路）
+    setTimeout(function(){ man.classList.add('show'); msg.textContent = 'Tap to continue'; }, 200);
+  }
+
+  W._WZ_P.then(function(url){
+    if (url){ man.setAttribute('href', url); go(url); return; }
+    if (url === ''){       // token 失效 → 退回完整迎賓，講清楚為什麼
+      document.documentElement.className = '';
+      return;
+    }
+    msg.className = 'fmsg warn';           // null = 網路失敗
+    msg.textContent = '連線不穩，點下方直接進入';
+    man.classList.add('show');
+  });
+
+  // 保底：1.6 秒還沒走 → 浮出真 <a> 大鈕
+  setTimeout(function(){
+    if (!gone) man.classList.add('show');
+  }, 1600);
 })();
-// 啟動：音效 + glitch 撕裂 + 紅閃 → 跳轉
-var sfx = new Audio('START.wav');
-sfx.preload = 'auto';
-var launched = false;
-function launch() {
-if (launched) return;
-launched = true;
-document.body.classList.add('launching');
-var gone = false;
-function goNow() {
-if (gone) return;
-gone = true;
-// ★ 乙案閘門：無感進網址(帶rc)優先，沒有才走手動 TARGET_URL
-window.location.href = window._WZ_AUTO_URL || TARGET_URL;
-}
-sfx.addEventListener('ended', goNow);          // 音效播完 → 跳轉
-setTimeout(goNow, 3200);                        // 保險絲：最多等 3.2 秒
-var p = null;
-try { sfx.currentTime = 0; p = sfx.play(); } catch(e) {}
-if (p && p.catch) p.catch(function(){ setTimeout(goNow, 800); }); // 播放失敗 → 照跳
-}
-// ★ 無感進自動開機：validate 成功時由第二刀呼叫（等同幫使用者按下進入）
-window._wzAutoLaunch = function(){ launch(); };
-document.addEventListener('click', launch);
-document.addEventListener('keydown', launch);
-document.addEventListener('touchend', launch, { passive: true });
-document.addEventListener('touchstart', function(){ try{ sfx.load(); }catch(e){} }, { passive: true, once: true });
-// ===== PWA Service Worker 註冊 =====
-if ('serviceWorker' in navigator) {
-window.addEventListener('load', function(){
-navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); })
-.then(function(){ console.log('SW 已註冊'); })
-.catch(function(e){ console.log('SW 註冊失敗', e); });
-});
+
+// PWA
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); }).catch(function(){});
+  });
 }
 </script>
 </body>
