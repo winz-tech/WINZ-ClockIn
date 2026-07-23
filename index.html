@@ -279,11 +279,9 @@ html.fast .slash{ display:none; }
   }, 1600);
 })();
 
-// PWA
+// PWA（不等 load：快速通道會提早導航，等 load 會來不及註冊）
 if ('serviceWorker' in navigator){
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); }).catch(function(){});
-  });
+  navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); }).catch(function(){});
 }
 </script>
 </body>
