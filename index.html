@@ -265,7 +265,11 @@ html.fast .slash{ display:none; }
     man.style.pointerEvents = 'none';   // ★ 已經在跳了，防連點（此時點不點都一樣）
     location.replace(url);
     // iOS PWA 可能吞掉 replace → 200ms 後還在就把大鈕推出來（坑B：蘋果留手按路）
-    setTimeout(function(){ man.classList.add('show'); msg.textContent = 'Tap to continue'; }, 200);
+    setTimeout(function(){
+      if (document.visibilityState === 'visible'){   // 真的還停在這頁才推鈕（跳成功的人不會看到）
+        _ready(); man.classList.add('show'); msg.textContent = '點一下繼續 →';
+      }
+    }, 1200);
   }
 
   function _ready(){
@@ -283,10 +287,12 @@ html.fast .slash{ display:none; }
     _ready(); man.classList.add('show');
   });
 
-  // 保底：1.6 秒還沒走 → 浮出真 <a> 大鈕
+  // 保底：4 秒還沒走才浮出真 <a> 大鈕
+  //   ★ 正常 1~2 秒就自動進去了，這顆平常不該被看到
+  //   ★ 但不能拿掉：iOS PWA 程式化跳轉會被 WebKit 靜默吞（坑B），這是唯一出路
   setTimeout(function(){
     if (!gone) { _ready(); man.classList.add('show'); }
-  }, 1600);
+  }, 4000);
 })();
 
 // PWA（不等 load：快速通道會提早導航，等 load 會來不及註冊）
