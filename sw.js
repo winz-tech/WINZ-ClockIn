@@ -1,5 +1,5 @@
 // ===== 穎利打卡 Service Worker v3（網路優先·HTML永不快取·強制更新）=====
-const CACHE = 'winz-punch-v3';   // ★改版時把 v3 改 v4、v5... 強制更新
+const CACHE = 'winz-punch-v4';   // ★改版時把 v3 改 v4、v5... 強制更新
 
 self.addEventListener('install', function(e){ self.skipWaiting(); });
 
