@@ -261,6 +261,8 @@ html.fast .slash{ display:none; }
   function go(url){
     if (gone) return; gone = true;
     bar.className = 'fbar done';
+    man.querySelector('.lab').textContent = '進入中…';
+    man.style.pointerEvents = 'none';   // ★ 已經在跳了，防連點（此時點不點都一樣）
     location.replace(url);
     // iOS PWA 可能吞掉 replace → 200ms 後還在就把大鈕推出來（坑B：蘋果留手按路）
     setTimeout(function(){ man.classList.add('show'); msg.textContent = 'Tap to continue'; }, 200);
