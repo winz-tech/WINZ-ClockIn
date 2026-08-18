@@ -6,37 +6,99 @@
 <title>登入中…</title>
 <style>
   body{background:#0a0a0c;margin:0;min-height:100vh;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:18px;font-family:-apple-system,"Noto Sans TC",sans-serif}
+    align-items:center;justify-content:center;gap:18px;padding:20px;
+    font-family:-apple-system,"Noto Sans TC",sans-serif}
   .spin{width:40px;height:40px;border:3px solid #2a2a30;border-top-color:#E30613;
     border-radius:50%;animation:s .8s linear infinite}
   @keyframes s{to{transform:rotate(360deg)}}
   .t{color:#fff;font-size:15px;font-weight:bold}
+  #manual{display:none;margin-top:6px;padding:14px 40px;text-decoration:none;
+    background:linear-gradient(135deg,#E30613,#8f0009);color:#fff;border-radius:8px;
+    font-size:16px;font-weight:bold;letter-spacing:2px;box-shadow:0 0 20px rgba(227,6,19,.4)}
+  #manual.show{display:block}
 </style>
 </head>
 <body>
-  <div class="spin"></div>
-  <div class="t">登入中…</div>
+  <div class="spin" id="spin"></div>
+  <div class="t" id="txt">登入中…</div>
+  <!-- ★【坑B】三件套的第三件：真 <a>，iOS 唯一 100% 有效的路 -->
+  <a id="manual" href="#" target="_top">繼續</a>
 <script>
 (function(){
-  var p = new URLSearchParams(location.search);
-  var tok  = p.get('tok')  || '';
-  var name = p.get('name') || '';
-  var shared = p.get('shared') || '';
-  var go   = p.get('go')   || '';
+  var WZ_EXEC = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
 
-  if (tok && shared !== '1') {
+  // ★ 只准跳回自己家。沒有白名單，?go=https://壞人.com 就是開放轉址漏洞（舊版有這個洞）
+  var ALLOW = ['https://winz-tech.github.io/', 'https://script.google.com/'];
+  var HOME  = 'https://winz-tech.github.io/WINZ-ClockIn/index.html';
+
+  var p      = new URLSearchParams(location.search);
+  var rc     = p.get('rc') || '';
+  var shared = p.get('shared') || '';
+  // ★ 不再接受 ?tok= —— 真鑰匙放網址會被記進瀏覽器歷史，那正是接力碼要防的事
+
+  function safeGo(u){
+    u = String(u || '');
+    for (var i = 0; i < ALLOW.length; i++) if (u.indexOf(ALLOW[i]) === 0) return u;
+    return HOME;
+  }
+  var dest = safeGo(p.get('go') || '');
+  var man  = document.getElementById('manual');
+
+  // ★★ 迴圈斷路器 ★★
+  //   同一個瀏覽階段進來第 3 次 = 一定有哪裡在轉圈 → 什麼都不做，直接放行
+  //   寧可少種一次 cookie，也不要讓人卡在轉圈圈裡（已經吃過一次虧）
+  try {
+    var n = Number(sessionStorage.getItem('_wzStHit') || 0) + 1;
+    sessionStorage.setItem('_wzStHit', String(n));
+    if (n > 2) { location.replace(dest); return; }
+  } catch(e){}
+
+  function setCk(k, v, days){
     try {
-      var maxage = 400*24*60*60;
-      document.cookie = 'WZ_TOKEN_CK=' + encodeURIComponent(tok) + '; max-age=' + maxage + '; path=/; SameSite=Lax';
-      if (name) document.cookie = 'WZ_NAME_CK=' + encodeURIComponent(name) + '; max-age=' + maxage + '; path=/; SameSite=Lax';
+      document.cookie = k + '=' + encodeURIComponent(v)
+        + '; max-age=' + (days*24*60*60) + '; path=/; SameSite=Lax; Secure';
     } catch(e){}
   }
 
-  // ★ 種完 cookie 等 350ms 再跳,給 iOS 把 cookie 寫進硬碟的時間(不然可能還沒落地就跳走)
-  setTimeout(function(){
-    if (go) { location.replace(go); }
-    else { location.replace('https://winz-tech.github.io/WINZ-ClockIn/index.html'); }
-  }, 350);
+  var jumped = false;
+  function jump(url){
+    if (jumped) return; jumped = true;
+    man.setAttribute('href', url);
+    // ① 種完 cookie 等 350ms 再跳，給 iOS 把 cookie 寫進硬碟的時間
+    setTimeout(function(){ try { location.replace(url); } catch(e){} }, 350);
+    // ② 保底：800ms 再直跳一次（Android/桌機此時已離開，跑不到這；iOS 才會執行）
+    setTimeout(function(){ try { location.href = url; } catch(e){} }, 800);
+    // ③ 2.5 秒還在這頁 → 推出真 <a> 大鈕。iOS 唯一保證有效的路是「手指真的點到」
+    setTimeout(function(){
+      if (document.visibilityState !== 'visible') return;   // 已經跳走的人不會看到
+      document.getElementById('spin').style.display = 'none';
+      document.getElementById('txt').textContent = '點一下繼續';
+      man.classList.add('show');
+    }, 2500);
+  }
+
+  if (!rc) { jump(dest); return; }   // 沒帶碼 → 不做事，直接放行
+
+  // ★ 看門狗：後端不回應也一定要走，絕不把人卡在轉圈圈
+  var done = false;
+  var wd = setTimeout(function(){ if (!done) { done = true; jump(dest); } }, 6000);
+
+  fetch(WZ_EXEC + '?page=redeem&rc=' + encodeURIComponent(rc))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (done) return; done = true; clearTimeout(wd);
+      if (!d || !d.ok) { jump(dest); return; }   // 換碼失敗 → 放行，讓目的地頁自己走登入流程
+
+      if (d.name) setCk('WZ_NAME_CK', d.name, 400);                       // 姓名：零風險，一律種
+      if (shared !== '1' && d.token) setCk('WZ_TOKEN_CK', d.token, 400);  // 真鑰匙：只有個人電腦
+
+      var u = dest + (dest.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(d.rc2 || '');
+      jump(d.rc2 ? u : dest);
+    })
+    .catch(function(){
+      if (done) return; done = true; clearTimeout(wd);
+      jump(dest);
+    });
 })();
 </script>
 </body>
