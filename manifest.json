@@ -3,7 +3,7 @@
   "short_name": "出勤系統",
   "description": "穎利科技打卡",
   "start_url": "./index.html",
-  "scope": "./",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0c",
