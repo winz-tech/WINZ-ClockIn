@@ -24,18 +24,29 @@
   <!-- ★【坑B】三件套的第三件：真 <a>，iOS 唯一 100% 有效的路 -->
   <a id="manual" href="#" target="_top">繼續</a>
 <script>
+/* ════════════════════════════════════════════════════════════
+   WINZ-ClockIn/savetoken.html　2026/09/06
+   ── 跟 portal/savetoken.html 是同一份，只有 HOME 指回自己家。
+      原本的邏輯一行沒改（接力碼、白名單、迴圈斷路器、跳轉三件套全部保留）。
+      2026/09/06 新增的只有兩樣：
+        ① 種完 cookie 立刻讀回來驗證（舊版是「寫了就跳」，寫不進去沒有人會知道）
+        ② 蓋時間戳記號（cookie 一份、localStorage 一份），
+           讓首頁能顯示「票 C?L?」，下次才量得出來票有沒有種對容器
+
+   ⚠ 為什麼兩個資料夾要各放一份：PWA 的 scope 只涵蓋 manifest.json 所在的資料夾。
+     捷徑裝哪一個，種票就要在哪一個 —— 跑出 scope，iOS 會把它丟進
+     「App 內臨時瀏覽器」，票就種在那個一關就消失的容器裡。
+     （cookie 本身是綁網域的，兩個資料夾共用同一個抽屜，所以種進去之後兩邊都讀得到。）
+   ════════════════════════════════════════════════════════════ */
 (function(){
   var WZ_EXEC = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
-
   // ★ 只准跳回自己家。沒有白名單，?go=https://壞人.com 就是開放轉址漏洞（舊版有這個洞）
   var ALLOW = ['https://winz-tech.github.io/', 'https://script.google.com/'];
-  var HOME  = 'https://winz-tech.github.io/WINZ-ClockIn/index.html';
-
+  var HOME  = 'https://winz-tech.github.io/WINZ-ClockIn/index.html';   // ★ 打卡自己的家
   var p      = new URLSearchParams(location.search);
   var rc     = p.get('rc') || '';
   var shared = p.get('shared') || '';
   // ★ 不再接受 ?tok= —— 真鑰匙放網址會被記進瀏覽器歷史，那正是接力碼要防的事
-
   function safeGo(u){
     u = String(u || '');
     for (var i = 0; i < ALLOW.length; i++) if (u.indexOf(ALLOW[i]) === 0) return u;
@@ -43,7 +54,6 @@
   }
   var dest = safeGo(p.get('go') || '');
   var man  = document.getElementById('manual');
-
   // ★★ 迴圈斷路器 ★★
   //   同一個瀏覽階段進來第 3 次 = 一定有哪裡在轉圈 → 什麼都不做，直接放行
   //   寧可少種一次 cookie，也不要讓人卡在轉圈圈裡（已經吃過一次虧）
@@ -52,14 +62,18 @@
     sessionStorage.setItem('_wzStHit', String(n));
     if (n > 2) { location.replace(dest); return; }
   } catch(e){}
-
   function setCk(k, v, days){
     try {
       document.cookie = k + '=' + encodeURIComponent(v)
         + '; max-age=' + (days*24*60*60) + '; path=/; SameSite=Lax; Secure';
     } catch(e){}
   }
-
+  // ★2026/09/06　讀得回來才算數
+  function getCk(k){
+    try { var m = document.cookie.match('(^|;)\\s*' + k + '\\s*=\\s*([^;]+)');
+          return m ? decodeURIComponent(m.pop()) : ''; }
+    catch(e){ return ''; }
+  }
   var jumped = false;
   function jump(url){
     if (jumped) return; jumped = true;
@@ -76,22 +90,27 @@
       man.classList.add('show');
     }, 2500);
   }
-
   if (!rc) { jump(dest); return; }   // 沒帶碼 → 不做事，直接放行
-
   // ★ 看門狗：後端不回應也一定要走，絕不把人卡在轉圈圈
   var done = false;
   var wd = setTimeout(function(){ if (!done) { done = true; jump(dest); } }, 6000);
-
   fetch(WZ_EXEC + '?page=redeem&rc=' + encodeURIComponent(rc))
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (done) return; done = true; clearTimeout(wd);
       if (!d || !d.ok) { jump(dest); return; }   // 換碼失敗 → 放行，讓目的地頁自己走登入流程
-
       if (d.name) setCk('WZ_NAME_CK', d.name, 400);                       // 姓名：零風險，一律種
       if (shared !== '1' && d.token) setCk('WZ_TOKEN_CK', d.token, 400);  // 真鑰匙：只有個人電腦
-
+      // ★2026/09/06　種完立刻讀回來 + 蓋時間戳
+      //   舊版是「寫了就跳」，寫不進去也不會有人知道 —— 這就是這三個月查不到病根的原因之一。
+      try {
+        var now = String(Date.now());
+        setCk('WZ_AT_CK', now, 400);
+        try { localStorage.setItem('WZ_AT_LS', now); } catch(e){}
+        if (shared !== '1' && d.token && getCk('WZ_TOKEN_CK') !== d.token) {
+          try { localStorage.setItem('WZ_SAVEFAIL_LS', now); } catch(e){}   // 種不進去，留個案發現場
+        }
+      } catch(e){}
       var u = dest + (dest.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(d.rc2 || '');
       jump(d.rc2 ? u : dest);
     })
