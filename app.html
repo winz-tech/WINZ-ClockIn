@@ -1,11 +1,207 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{width:100%;height:100%;border:none}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>穎利科技｜作業中心</title>
+<meta name="theme-color" content="#0a0a0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="穎利ERP">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#000}
+  /* ★2026/09/08　寬螢幕限寬置中。
+     手機（<=1180px）完全等同舊版滿版，一個像素都沒變；
+     電腦上不再整片攤開，兩側留黑，內層拿到的寬度跟手機一樣。 */
+  #pad{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);
+    width:100%;max-width:1180px;padding-top:env(safe-area-inset-top,0px);
+    background:#0a0a0c}
+  #frame{width:100%;height:100%;border:0;display:block;background:#0a0a0c}
+  #veil{position:fixed;inset:0;z-index:10;background:#0a0a0c;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+    font-family:-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;
+    transition:opacity .4s ease;padding:24px;text-align:center}
+  #veil.hide{opacity:0;pointer-events:none}
+  .spin{width:42px;height:42px;border:3px solid #2a2a30;border-top-color:#E30613;
+    border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .t{color:#fff;font-size:16px;font-weight:bold;letter-spacing:2px}
+  .s{color:#8a8a92;font-size:13px;line-height:1.8}
+  .btn{display:none;margin-top:6px;padding:14px 38px;border:0;cursor:pointer;
+    text-decoration:none;border-radius:8px;font-family:inherit;
+    background:linear-gradient(135deg,#E30613,#8f0009);color:#fff;
+    font-size:16px;font-weight:bold;letter-spacing:3px;
+    box-shadow:0 0 20px rgba(227,6,19,.4)}
+  .btn.on{display:inline-block}
+</style>
 </head>
 <body>
-  <iframe src="https://script.google.com/macros/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec?page=punch"></iframe>
+<div id="pad"><iframe id="frame" title="穎利科技作業中心"
+        referrerpolicy="no-referrer-when-downgrade" allow="clipboard-write"></iframe></div>
+
+<div id="veil">
+  <div class="spin" id="spin"></div>
+  <div class="t" id="msg">連線中…</div>
+  <div class="s" id="sub"></div>
+  <a class="btn" id="go" href="index.html">前往登入</a>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   app.html　外殼　v4　2026/09/08
+   ── portal/ 與 WINZ-ClockIn/ 兩個資料夾放的是「同一份檔案」。
+      裡面沒有任何一行寫死資料夾名字（「前往登入」是相對路徑 index.html，
+      放哪一夾就回哪一夾的首頁），所以以後只要維護一份，兩邊各貼一次。
+
+   在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
+     ① iOS 不會再開「App 內臨時瀏覽器」→ 票、裝置ID、推播訂閱、
+        「我按過 ✕ 了」全部記得住
+     ② script.google.com 那條白色橫幅只在頂層才長得出來 → 包進來就沒了
+
+   換頁怎麼運作：
+     內層呼叫 wzGo(url)（定義在 01-auth，34 支共用）
+       → window.top.postMessage({wz:'shell-nav', url})
+       → 這裡收到，立刻回一個 {wz:'shell-ack'} 讓內層知道「有殼接住了」
+       → 這裡去換一張新鮮的 rc，塞進 iframe.src
+     內層沒收到 ack（250ms）→ 當作沒有殼，照原本的方式自己跳。
+     ★ 所以「有殼」「沒殼」兩種都活，電腦直接開 GAS 網址的人完全不受影響。
+
+   v4 改了什麼（只有兩處，邏輯一行沒動）：
+     ① 寬螢幕限寬置中（max-width:1180px），電腦上不再整片攤開
+     ② 註解改成兩夾通用
+
+   ⚠ 內層 GAS 的每個 page 分支都要有
+     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+     否則那一頁在殼裡會是一片空白。
+   ════════════════════════════════════════════════════════════ */
+(function(){
+  // 打卡專案（09-人事管理-考勤薪資系統）。抽屜裡的頁全部都在這一支。
+  var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+  // ★ 只准載自己人。沒有白名單，內層被注入就能把使用者導去任何地方。
+  // ★★ 而且只認「已經加過 ALLOWALL 的專案」。
+  //   沒加那一行的專案嵌進來會是一片空白 —— 那比掀殼更糟（掀殼至少還能用）。
+  //   不在名單上 → 外殼不回應 → 內層等 250ms 自己頂層跳出去。**能用優先。**
+  //   之後每推一支專案，就把它的部署碼加進這個陣列。
+  var SHELL_OK = [
+    'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3'  // 09-人事管理-考勤薪資系統
+  ];
+
+  var frame = document.getElementById('frame');
+  var veil  = document.getElementById('veil');
+  var spin  = document.getElementById('spin');
+  var msg   = document.getElementById('msg');
+  var sub   = document.getElementById('sub');
+  var go    = document.getElementById('go');
+
+  function getCk(k){
+    try { var m = document.cookie.match('(^|;)\\s*' + k + '\\s*=\\s*([^;]+)');
+          return m ? decodeURIComponent(m.pop()) : ''; }
+    catch(e){ return ''; }
+  }
+  function showVeil(title, detail, btnText, btnHref){
+    spin.style.display = detail ? 'none' : '';
+    msg.textContent = title;
+    sub.innerHTML = detail || '';
+    if (btnText){ go.textContent = btnText; go.setAttribute('href', btnHref || 'index.html'); go.classList.add('on'); }
+    else { go.classList.remove('on'); }
+    veil.classList.remove('hide');
+  }
+  function safeUrl(u){
+    u = String(u || '');
+    if (u.indexOf('https://script.google.com/') !== 0) return '';
+    var id = (u.match(/\/s\/([^\/?]+)/) || [])[1] || '';       // ★ 比部署碼不比網址（【坑L】）
+    return (SHELL_OK.indexOf(id) > -1) ? u : '';
+  }
+
+  // 外層網址的 ?page= 原樣帶進內層（app.html?page=leave → 內層開請假）
+  function outerPage(){
+    try { return new URLSearchParams(location.search).get('page') || 'punch'; }
+    catch(e){ return 'punch'; }
+  }
+
+  var watchdog = null;
+  // url 省略 → 用外層 ?page= 組打卡專案的網址
+  function load(url){
+    var target = url ? safeUrl(url) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
+    if (!target){                                    // 不在白名單 → 不載，也不靜靜吞掉
+      showVeil('無法開啟', '這個位置不在允許範圍內。', '回首頁', 'index.html');
+      return;
+    }
+    showVeil('連線中…', '');
+    clearTimeout(watchdog);
+    watchdog = setTimeout(function(){
+      showVeil('連線逾時', '網路慢或系統忙碌，<br>可以再試一次。', '重新載入', 'javascript:location.reload()');
+    }, 20000);
+
+    var tok = getCk('WZ_TOKEN_CK');
+    if (!tok){
+      clearTimeout(watchdog);
+      showVeil('尚未登入', '請先從首頁登入一次，<br>之後這裡就會自動進入。', '前往登入', 'index.html');
+      return;
+    }
+
+    // ★ 每次載入都跟後端要一張新鮮的接力碼。
+    //   rc 只活 60 秒、用過即焚，所以不能重用，也不能提前拿。
+    //   接力碼是跨專案通用的 —— 換到別支專案也是靠這張。
+    fetch(PUNCH + '?page=validate&t=' + encodeURIComponent(tok) + '&fresh=1')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok){
+          clearTimeout(watchdog);
+          showVeil('登入已失效', '請重新登入一次。', '前往登入', 'index.html');
+          return;
+        }
+        var u = target;
+        if (d.rc) u += (u.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(d.rc);
+        frame.src = u;
+      })
+      .catch(function(){
+        clearTimeout(watchdog);
+        showVeil('連線失敗', '請確認網路後再試一次。', '重新載入', 'javascript:location.reload()');
+      });
+  }
+
+  frame.addEventListener('load', function(){
+    if (!frame.src || frame.src === 'about:blank') return;   // about:blank 也會觸發，要擋掉
+    clearTimeout(watchdog);
+    setTimeout(function(){ veil.classList.add('hide'); }, 350);
+  });
+
+  // ── 內層喊話 ────────────────────────────────────────────────
+  window.addEventListener('message', function(ev){
+    var o = ev.origin || '';
+    // GAS 的使用者內容跑在 *.googleusercontent.com；外層包裝是 script.google.com
+    if (!/\.googleusercontent\.com$/.test(o) && o !== 'https://script.google.com') return;
+    var d = ev.data; if (!d) return;
+
+    if (d.wz === 'shell-nav'){
+      var u = safeUrl(d.url);
+      // ★ 不在名單上就「不要回 ack」——讓內層逾時後自己頂層跳出去。
+      //   （回了 ack 卻載不進來，使用者會看到一片空白，那比掀殼更糟。）
+      if (!u) return;
+      // ★ 確認接得住才回 ack，而且要在任何 fetch 之前回 —— 內層只等 250ms。
+      try { ev.source.postMessage({ wz:'shell-ack' }, o); } catch(e){}
+      // 網址列同步，讓重新整理回到同一頁
+      try {
+        var pg = (u.match(/[?&]page=([^&]+)/) || [])[1] || '';
+        history.replaceState(null, '', pg ? ('?page=' + pg) : location.pathname);
+      } catch(e){}
+      load(u);
+      return;
+    }
+
+    if (d.wz === 'shell-logout'){
+      try { ev.source.postMessage({ wz:'shell-ack' }, o); } catch(e){}
+      frame.src = 'about:blank';
+      location.replace('index.html?logout=1');
+      return;
+    }
+  });
+
+  load();
+})();
+</script>
 </body>
 </html>
