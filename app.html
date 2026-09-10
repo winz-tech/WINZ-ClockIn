@@ -194,9 +194,11 @@
     //        會卡在「尚未登入 → 前往登入」→ 回來又被擋 → 無限迴圈。
     //   ⚠ 帶碼的人已經自己證明過身分了，殼不該再插一手。
     if (/[?&]rc=/.test(target)){
+      _stamp('帶碼載入 rc=' + ((target.match(/[?&]rc=([^&]{0,6})/) || [])[1] || '?'));
       frame.src = target;
       return;
     }
+    _stamp('無碼→自己換一張');
 
     var tok = getCk('WZ_TOKEN_CK');
     if (!tok){
