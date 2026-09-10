@@ -50,10 +50,12 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v4　2026/09/08
+   app.html　外殼　v5　2026/09/10
    ── portal/ 與 WINZ-ClockIn/ 兩個資料夾放的是「同一份檔案」。
       裡面沒有任何一行寫死資料夾名字（「前往登入」是相對路徑 index.html，
-      放哪一夾就回哪一夾的首頁），所以以後只要維護一份，兩邊各貼一次。
+      放哪一夾就回哪一夾的首頁），所以維護一份，兩邊各貼一次。
+      ⚠ 2026/09/10 發現兩夾早就不一樣了（ClockIn 那份還停在 v3 的
+        「沒帶 page 就預設 punch」）。這一版兩邊校正回同一份。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
      ① iOS 不會再開「App 內臨時瀏覽器」→ 票、裝置ID、推播訂閱、
@@ -64,13 +66,16 @@
      內層呼叫 wzGo(url)（定義在 01-auth，34 支共用）
        → window.top.postMessage({wz:'shell-nav', url})
        → 這裡收到，立刻回一個 {wz:'shell-ack'} 讓內層知道「有殼接住了」
-       → 這裡去換一張新鮮的 rc，塞進 iframe.src
+       → 這裡把 iframe 換過去
      內層沒收到 ack（250ms）→ 當作沒有殼，照原本的方式自己跳。
-     ★ 所以「有殼」「沒殼」兩種都活，電腦直接開 GAS 網址的人完全不受影響。
+     ★ 「有殼」「沒殼」兩種都活，電腦直接開 GAS 網址的人完全不受影響。
 
-   v4 改了什麼（只有兩處，邏輯一行沒動）：
-     ① 寬螢幕限寬置中（max-width:1180px），電腦上不再整片攤開
-     ② 註解改成兩夾通用
+   v5 改了什麼（2026/09/10，全部是現場 PIN 那條線踩出來的）：
+     ① SHELL_OK 加生產管理、01-製令領料退料單
+     ② 具名捷徑 SHELL_GO ＋ ?go= —— 平板主畫面圖示直接開現場 PIN 終端
+     ③ 網址已自帶 rc 就直接載，不要再換一張（否則會把人洗成設備）
+     ④ 網址列同步只對打卡專案做（否則重整會跑去打卡專案找同名的頁）
+     ⑤ 新增 shell-ping —— 讓內層在點擊【當下同步】知道有沒有殼
 
    ⚠ 內層 GAS 的每個 page 分支都要有
      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -79,14 +84,27 @@
 (function(){
   // 打卡專案（09-人事管理-考勤薪資系統）。抽屜裡的頁全部都在這一支。
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
+
   // ★ 只准載自己人。沒有白名單，內層被注入就能把使用者導去任何地方。
   // ★★ 而且只認「已經加過 ALLOWALL 的專案」。
   //   沒加那一行的專案嵌進來會是一片空白 —— 那比掀殼更糟（掀殼至少還能用）。
   //   不在名單上 → 外殼不回應 → 內層等 250ms 自己頂層跳出去。**能用優先。**
   //   之後每推一支專案，就把它的部署碼加進這個陣列。
   var SHELL_OK = [
-    'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3'  // 09-人事管理-考勤薪資系統
+    'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3',  // 09-人事管理-考勤薪資系統
+    'AKfycbzv6_SW-xS6_Rnbbjdc_DKLN8VSc2IsbBtzMMsdauC-LqXPrEfYnGe_w54QBL3t6OL_YQ',  // 生產管理（日報表／排程／工序）
+    'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'    // 01-製令領料退料單（現場PIN／發料登記）
   ];
+
+  // ★2026/09/10 具名捷徑：外層 ?go=field-pin 就開現場 PIN 終端。
+  //   ⚠ 用【具名】不用「?u=整串網址」——
+  //     網址列上放一串可控的目標，等於把白名單的判斷交給打字的人。
+  //     具名的話，「這個殼能開什麼」在這裡就看得完（【架構-3】指名不要形容）。
+  var SHELL_GO = {
+    'field-pin': 'https://script.google.com/a/macros/winz-tech.com/s/'
+               + 'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'
+               + '/exec?page=field-pin'
+  };
 
   var frame = document.getElementById('frame');
   var veil  = document.getElementById('veil');
@@ -116,15 +134,33 @@
   }
 
   // 外層網址的 ?page= 原樣帶進內層（app.html?page=leave → 內層開請假）
+  // ★ 2026/09/09：不再預設 'punch' —— 沒帶 page 代表「不知道要看什麼」，
+  //   不能偷偷幫使用者決定去打卡，要退回 index.html 讓他自己選。
+  //   「一開 portal 就跳打卡」就是這裡原本無條件 fallback 造成的。
   function outerPage(){
-    try { return new URLSearchParams(location.search).get('page') || 'punch'; }
-    catch(e){ return 'punch'; }
+    try { return new URLSearchParams(location.search).get('page') || ''; }
+    catch(e){ return ''; }
+  }
+  function outerGo(){
+    try { return new URLSearchParams(location.search).get('go') || ''; }
+    catch(e){ return ''; }
   }
 
   var watchdog = null;
-  // url 省略 → 用外層 ?page= 組打卡專案的網址
+  // url 省略 → 用外層 ?go=（具名捷徑）或 ?page=（打卡專案）決定要開哪一頁
   function load(url){
-    var target = url ? safeUrl(url) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
+    var pg  = outerPage();
+    var gok = outerGo();
+    if (!url && !pg && !gok){
+      location.replace('index.html');
+      return;
+    }
+    // ⚠ 具名捷徑也要過 safeUrl —— 名字對不對是一回事，
+    //   它指到的部署碼在不在白名單上是另一回事，兩個都要驗。
+    var target = url ? safeUrl(url)
+               : (gok ? safeUrl(SHELL_GO[gok] || '')
+                      : (PUNCH + '?page=' + encodeURIComponent(pg)));
+
     if (!target){                                    // 不在白名單 → 不載，也不靜靜吞掉
       showVeil('無法開啟', '這個位置不在允許範圍內。', '回首頁', 'index.html');
       return;
@@ -134,6 +170,19 @@
     watchdog = setTimeout(function(){
       showVeil('連線逾時', '網路慢或系統忙碌，<br>可以再試一次。', '重新載入', 'javascript:location.reload()');
     }, 20000);
+
+    // ★2026/09/10 網址已經自帶接力碼 → 直接載，不要再去換一張。
+    //   ⚠ 為什麼一定要有這一條：
+    //     ① 現場 PIN 的卡片是用【那個人】的 token 發碼的。
+    //        殼手上的 WZ_TOKEN_CK 是【設備】的 ——
+    //        再換一張會把「那個人」洗成「產線2平板」，那個章就簽了個寂寞。
+    //     ② 平板根本沒有 WZ_TOKEN_CK 這個 cookie，
+    //        會卡在「尚未登入 → 前往登入」→ 回來又被擋 → 無限迴圈。
+    //   ⚠ 帶碼的人已經自己證明過身分了，殼不該再插一手。
+    if (/[?&]rc=/.test(target)){
+      frame.src = target;
+      return;
+    }
 
     var tok = getCk('WZ_TOKEN_CK');
     if (!tok){
@@ -176,6 +225,15 @@
     if (!/\.googleusercontent\.com$/.test(o) && o !== 'https://script.google.com') return;
     var d = ev.data; if (!d) return;
 
+    // ★2026/09/10 探殼。內層只想知道「有沒有殼」，不要導航。
+    //   為什麼需要：內層必須在【點擊當下同步】決定要 postMessage 還是讓 <a> 自己跳，
+    //   而 shell-nav 的 ack 是非同步的（等 250ms），來不及在 click 事件裡做決定。
+    //   iOS 只認真手勢，錯過就整個吞掉（【坑B】）。
+    if (d.wz === 'shell-ping'){
+      try { ev.source.postMessage({ wz:'shell-ack' }, o); } catch(e){}
+      return;
+    }
+
     if (d.wz === 'shell-nav'){
       var u = safeUrl(d.url);
       // ★ 不在名單上就「不要回 ack」——讓內層逾時後自己頂層跳出去。
@@ -183,11 +241,22 @@
       if (!u) return;
       // ★ 確認接得住才回 ack，而且要在任何 fetch 之前回 —— 內層只等 250ms。
       try { ev.source.postMessage({ wz:'shell-ack' }, o); } catch(e){}
+
       // 網址列同步，讓重新整理回到同一頁
+      // ⚠ 只有【打卡專案】的頁可以寫 ?page=。
+      //   因為 load() 在沒有 url 時，一律把 ?page= 當成【打卡專案】的頁去組網址 ——
+      //   把別支專案的 page 寫上去，重新整理就會跑去打卡專案找同名的頁，
+      //   找不到就落到打卡首頁。
+      //   ★ 2026/09/10 現場 PIN 點「生產日報表」踩到：登入完竟然跳到打卡畫面。
+      // ⚠ 非打卡的頁一律【不動網址】→ 重新整理回到最初那一頁
+      //   （平板是 ?go=field-pin，也就是回 PIN 選人畫面）。
+      //   共用平板上這反而是對的：重整不該接續上一個人的畫面。
       try {
+        var isPunch = (u.indexOf(PUNCH) === 0);
         var pg = (u.match(/[?&]page=([^&]+)/) || [])[1] || '';
-        history.replaceState(null, '', pg ? ('?page=' + pg) : location.pathname);
+        if (isPunch) history.replaceState(null, '', pg ? ('?page=' + pg) : location.pathname);
       } catch(e){}
+
       load(u);
       return;
     }
