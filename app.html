@@ -35,6 +35,25 @@
     font-size:16px;font-weight:bold;letter-spacing:3px;
     box-shadow:0 0 20px rgba(227,6,19,.4)}
   .btn.on{display:inline-block}
+
+  /* ★2026/09/10 v6：版號戳章改成「平常看不見，連點四下才出現」。
+     為什麼不直接拿掉：它是這條動線上唯一能回答「殼到底更新了沒」的東西，
+     而外殼在 GitHub、改一次要重新上傳，臨時想加就來不及了（【坑D】對暗號）。
+     為什麼不常駐：平板是給作業員用的，右下角一串英文是純雜訊。 */
+  #shellver{position:fixed;right:9px;bottom:8px;z-index:40;pointer-events:none;
+    font-size:11px;letter-spacing:1px;color:#c9c9d1;
+    font-family:ui-monospace,monospace;
+    background:rgba(10,10,12,.88);border:1px solid rgba(227,6,19,.45);
+    border-radius:7px;padding:5px 10px;white-space:nowrap;
+    opacity:0;transform:translateY(6px);transition:opacity .25s ease,transform .25s ease}
+  #shellver.on{opacity:1;transform:none}
+
+  /* 隱藏熱區：右下角，連點四下叫出戳章。
+     ⚠ 這一小塊會吃掉該位置的點擊 —— 內層底部按鈕的【最角落】會被它擋住。
+       34px 是取捨後的值：小到不容易誤觸，大到手指點得到。
+       嫌它擋路就把 34px 調小；完全不想要就把 display 改成 none。 */
+  #vertap{position:fixed;right:0;bottom:0;width:34px;height:34px;z-index:41;
+    background:transparent;-webkit-tap-highlight-color:transparent}
 </style>
 </head>
 <body>
@@ -48,21 +67,19 @@
   <a class="btn" id="go" href="index.html">前往登入</a>
 </div>
 
-<!-- ★2026/09/10 版號戳章（【坑D】第五步「對暗號」）。
+<!-- ★ 版號戳章（【坑D】第五步「對暗號」）。
      沒有它，「新檔案沒生效」和「生效了但行為一樣」長得一模一樣，
-     而這兩件事要修的地方完全無關。今天已經被這個坑掉一次了。 -->
-<div style="position:fixed;right:7px;bottom:5px;z-index:20;pointer-events:none;
-            font-size:10px;letter-spacing:1px;color:#4a4a55;
-            font-family:ui-monospace,monospace" id="shellver">SHELL v5 · 09/10</div>
+     而這兩件事要修的地方完全無關。2026/09/10 已經被這個坑掉一次。
+     v6 起改為隱藏：右下角連點四下才浮出來 3 秒。 -->
+<div id="shellver">SHELL v6 · 09/10</div>
+<div id="vertap"></div>
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v5　2026/09/10
+   app.html　外殼　v6　2026/09/10
    ── portal/ 與 WINZ-ClockIn/ 兩個資料夾放的是「同一份檔案」。
       裡面沒有任何一行寫死資料夾名字（「前往登入」是相對路徑 index.html，
       放哪一夾就回哪一夾的首頁），所以維護一份，兩邊各貼一次。
-      ⚠ 2026/09/10 發現兩夾早就不一樣了（ClockIn 那份還停在 v3 的
-        「沒帶 page 就預設 punch」）。這一版兩邊校正回同一份。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
      ① iOS 不會再開「App 內臨時瀏覽器」→ 票、裝置ID、推播訂閱、
@@ -77,7 +94,12 @@
      內層沒收到 ack（250ms）→ 當作沒有殼，照原本的方式自己跳。
      ★ 「有殼」「沒殼」兩種都活，電腦直接開 GAS 網址的人完全不受影響。
 
-   v5 改了什麼（2026/09/10，全部是現場 PIN 那條線踩出來的）：
+   v6 改了什麼（2026/09/10 下午）：
+     ① 版號戳章改成隱藏 —— 右下角【連點四下】才浮出來 3 秒。
+        平板交給作業員了，畫面上不該有給工程師看的字。
+     ② 版號 v5 → v6（一點就知道這份有沒有上傳成功）
+
+   v5 改了什麼（2026/09/10 上午，全部是現場 PIN 那條線踩出來的）：
      ① SHELL_OK 加生產管理、01-製令領料退料單
      ② 具名捷徑 SHELL_GO ＋ ?go= —— 平板主畫面圖示直接開現場 PIN 終端
      ③ 網址已自帶 rc 就直接載，不要再換一張（否則會把人洗成設備）
@@ -120,12 +142,39 @@
   var sub   = document.getElementById('sub');
   var go    = document.getElementById('go');
 
-  // ★2026/09/10 讓殼自己說「我到底載了什麼」。
-  //   ⚠ 「殼弄丟 rc」和「rc 送到了但 GAS 丟掉」在畫面上長得一模一樣（都是登入牆），
-  //     但要修的地方完全不同 —— 一定要分開（【架構-14】）。查完就刪。
+  // ══ 版號戳章（隱藏版）══════════════════════════════════════
+  // 平常不顯示，右下角連點四下才浮出來 3 秒。
+  // ⚠ 「殼弄丟 rc」和「rc 送到了但 GAS 丟掉」在畫面上長得一模一樣（都是登入牆），
+  //   但要修的地方完全不同 —— 所以這行字必須留著，只是不該常駐（【架構-14】）。
+  var VER = 'SHELL v6 · 09/10';
+  var _verTxt = VER, _verEl = document.getElementById('shellver'), _verT = null;
+
   function _stamp(s){
-    try { document.getElementById('shellver').textContent = 'SHELL v5 · ' + s; } catch(e){}
+    _verTxt = VER + (s ? ' · ' + s : '');
+    try { _verEl.textContent = _verTxt; } catch(e){}
   }
+  function _verShow(){
+    try {
+      _verEl.textContent = _verTxt;
+      _verEl.classList.add('on');
+      clearTimeout(_verT);
+      _verT = setTimeout(function(){ _verEl.classList.remove('on'); }, 3000);
+    } catch(e){}
+  }
+  // 連點四下（2 秒內）→ 顯示。中斷超過 2 秒就重新算。
+  (function(){
+    var n = 0, t0 = 0;
+    var zone = document.getElementById('vertap');
+    if (!zone) return;
+    function tap(){
+      var now = Date.now();
+      if (now - t0 > 2000) n = 0;   // 上一下太久以前 → 重新數
+      t0 = now; n++;
+      if (n >= 4){ n = 0; _verShow(); }
+    }
+    // pointerdown 一種就好 —— 同時綁 click 會在觸控裝置上算成兩下
+    zone.addEventListener('pointerdown', tap, { passive:true });
+  })();
 
   function getCk(k){
     try { var m = document.cookie.match('(^|;)\\s*' + k + '\\s*=\\s*([^;]+)');
