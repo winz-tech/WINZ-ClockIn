@@ -35,8 +35,16 @@
 </style>
 </head>
 <body>
+<!-- ★2026/09/17　allow 一定要列權限 —— 跨來源 iframe 預設什麼都沒有。
+     09/17 早上全公司打不了卡，就是因為這裡少了 geolocation：
+     打卡頁拿不到定位，畫面只能說「請開啟定位權限」，而使用者去設定裡開一百次也沒用。
+     ⚠ 這些權限是綁【頂層網域】的。進殼之後頂層從 script.google.com 變成
+       winz-tech.github.io，所以每個人都會被【重新問一次】。這一下逃不掉，上線前要先講。
+     ⚠ camera 先放進來：掃碼、拍照那幾支專案以後進殼會用到。
+       沒有用到的權限不會自己彈窗，多列不會打擾人；少列才會悄悄壞掉。 -->
 <div id="pad"><iframe id="frame" title="穎利科技作業中心"
-        referrerpolicy="no-referrer-when-downgrade" allow="clipboard-write"></iframe></div>
+        referrerpolicy="no-referrer-when-downgrade"
+        allow="geolocation; camera; clipboard-write"></iframe></div>
 
 <div id="veil">
   <div class="spin" id="spin"></div>
