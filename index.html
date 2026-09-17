@@ -30,7 +30,7 @@
   //     那顆必須直接去 GAS 讓它跳 Google 登入 —— 送去 app.html 會被擋下來
   //     說「尚未登入」然後丟回這一頁，無限迴圈。（btnEnter 那行不動。）
   //   ⚠ 要退版：把 WZ_SHELL 改回 W.WZ_TARGET，秒退。
-  W.WZ_SHELL = W.WZ_TARGET;
+W.WZ_SHELL = 'app.html';
   document.documentElement.className = 'fast';   // ★ 立刻決定走哪條路，不閃畫面
   // ★ 不再帶 fresh=1：rc 由外殼每次載入自己現拿。
   //   這裡只需要知道「這張票還有效嗎」。少燒一張 60 秒即焚的碼，
