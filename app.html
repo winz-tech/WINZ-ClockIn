@@ -137,6 +137,7 @@
 
   var watchdog = null;
   var _lastRelogin = 0;   // ★ shell-relogin 冷卻（見下方 message 處理）
+  var _netTry = 0;        // ★ 連線重試次數（見 load 的 catch）
   function load(url){
     var want   = url || outerGo();
     var target = want ? safeUrl(want) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
@@ -168,10 +169,23 @@
         }
         var u = target;
         if (d.rc) u += (u.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(d.rc);
+        _netTry = 0;                    // ★ 通了就歸零
         frame.src = u;
       })
       .catch(function(){
         clearTimeout(watchdog);
+        // ★2026/09/20　不要第一次就放棄。
+        //   平板放著幾十分鐘、螢幕關著，Wi-Fi 多半是斷的或在省電；
+        //   一按開機鍵殼就發 fetch，那一刻網路還沒接回來 —— 這不是「連線失敗」，
+        //   是「太早問」。等一下再問就好了。
+        //   ⚠ 退避遞增，最多 3 次（約 9 秒）。真的不行才把畫面交給人。
+        if (_netTry < 3) {
+          _netTry++;
+          showVeil('連線中…', '');      // 維持轉圈，不要嚇到現場
+          setTimeout(function(){ load(url); }, 1500 * _netTry);
+          return;
+        }
+        _netTry = 0;
         showVeil('連線失敗', '請確認網路後再試一次。', '重新載入', 'javascript:location.reload()');
       });
   }
