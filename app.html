@@ -136,6 +136,7 @@
   }
 
   var watchdog = null;
+  var _lastRelogin = 0;   // ★ shell-relogin 冷卻（見下方 message 處理）
   function load(url){
     var want   = url || outerGo();
     var target = want ? safeUrl(want) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
@@ -196,6 +197,22 @@
     //      借用同一個字會讓它誤判「殼接住了」。
     if (d.wz === 'shell-ping'){
       try { ev.source.postMessage({ wz:'shell-here', ok: SHELL_OK.slice() }, o); } catch(e){}
+      return;
+    }
+
+    // ★2026/09/20　內層喊「我沒票了」→ 殼重新 load()，注一張新鮮的 rc。
+    //   為什麼這條是必要的：內層的登入牆是用 JS 蓋一層 div 上去的，不是新導航
+    //   → iframe 不會再觸發 load → 殼完全看不見內層已經掛了。
+    //   殼手上有 github.io 的第一方 cookie（設備帳號），隨時換得到新鮮 rc，
+    //   所以「人的票逾時」可以自動退回設備身分，使用者只看到畫面閃一下。
+    //   ⚠ 一定要有冷卻：殼重載 → 內層還是沒票 → 又喊 → 無限迴圈。
+    //     30 秒內只受理一次；冷卻中不理會，內層就照原流程去跳登入牆。
+    //   ⚠ 不要回 ack —— wzGo 在等 shell-ack，回了會讓它誤判。
+    if (d.wz === 'shell-relogin'){
+      var _nowT = Date.now();
+      if (_nowT - _lastRelogin < 30000) return;
+      _lastRelogin = _nowT;
+      load();          // 不帶參數 → 從網址列的 ?go= / ?page= 重新推導，剛好是目前這一頁
       return;
     }
 
