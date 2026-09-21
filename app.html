@@ -39,6 +39,32 @@
     font-size:16px;font-weight:bold;letter-spacing:3px;
     box-shadow:0 0 20px rgba(227,6,19,.4)}
   .btn.on{display:inline-block}
+
+  /* ★2026/09/21 v6f　開機畫面（splash）。
+     正常載入時殼這一層不是「loading」，是「App 正在啟動」——
+     跟內層那個 loading 做的不是同一件事，就不要長得一樣，不然人會數「一個、兩個」。
+     ⚠ 只改正常載入的樣子；所有錯誤畫面（逾時／失敗／未登入）完全照舊。 */
+  #splashLogo,.bar,.slow{display:none}
+  #veil.splash #splashLogo{display:block}
+  #veil.splash .bar{display:block}
+  #veil.splash .spin,#veil.splash .t,#veil.splash .s,#veil.splash .btn{display:none}
+  #veil.splash.slow .slow{display:block}
+  #splashLogo{width:auto;height:56px;max-width:70vw;object-fit:contain;
+    filter:drop-shadow(0 0 14px rgba(227,6,19,.5));
+    animation:logoIn .6s ease-out both}
+  @media (max-width:480px){ #splashLogo{height:44px} }
+  @keyframes logoIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  .bar{width:120px;height:2px;border-radius:2px;overflow:hidden;background:#1e1e24}
+  .bar i{display:block;width:40%;height:100%;border-radius:2px;
+    background:linear-gradient(90deg,transparent,#E30613,transparent);
+    animation:barRun 1.1s ease-in-out infinite}
+  @keyframes barRun{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+  .slow{color:#6a6a72;font-size:12px;letter-spacing:2px;animation:logoIn .4s ease-out both}
+  @media (prefers-reduced-motion:reduce){
+    #splashLogo,.slow{animation:none}
+    .bar i{animation-duration:2.4s}
+  }
+
   /* ★2026/09/21　量測品：殼的版號戳章。穩定之後整段拿掉（連同 body 裡的 #shellStamp）。 */
   #shellStamp{position:fixed;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
     z-index:20;pointer-events:none;
@@ -57,9 +83,14 @@
         referrerpolicy="no-referrer-when-downgrade"
         allow="geolocation; camera; clipboard-write"></iframe></div>
 
-<div id="veil">
+<!-- ★ v6f　一開始就是 splash，第一格畫面不會再閃「連線中…」 -->
+<div id="veil" class="splash">
+    <img id="splashLogo" src="/portal/winz-logo.png" alt="穎利科技 WINZ"
+       onerror="this.onerror=null;this.src='icon-192.png'">
+  <div class="bar"><i></i></div>
+  <div class="slow">連線中…</div>
   <div class="spin" id="spin"></div>
-  <div class="t" id="msg">連線中…</div>
+  <div class="t" id="msg"></div>
   <div class="s" id="sub"></div>
   <a class="btn" id="go" href="index.html">前往登入</a>
 </div>
@@ -68,7 +99,7 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v6d　2026/09/21
+   app.html　外殼　v6f　2026/09/21
    ── portal/ 與 WINZ-ClockIn/ 放的是「同一份檔案」，沒有寫死資料夾名字。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
@@ -77,34 +108,32 @@
      ③ ★ 每次載入都現拿一張新鮮的 rc 注進 iframe ——
         內層那個 googleusercontent origin 的 localStorage 就算被 iOS 清掉也沒差。
 
-   ══ v6d 改了什麼（2026/09/21）══
-     ★① J 的真正病根：燒過的 rc 黏在 ?go= 上
-        平板 PIN 頁的卡片會自己帶一張「這個人」的 rc。點下去 → shell-nav →
-        殼把【整串含 rc】寫進 ?go=，再接一張自己的 → 兩張 rc，GAS 只認第一張。
-        第一次沒事；之後任何重載（睡醒／shell-relogin）都從 ?go= 讀回那張
-        【早就燒掉的人的碼】→ J → 退回本機人的共用票 →（逾時）B → D2。
-        shell-relogin 在平板上從來救不起來，就是因為它每次都重送同一張死碼。
-        修法：?go= 一律刮掉 rc；load() 接新碼前再刮一次。
-     ② 內層自己帶了 rc（身分交接）→ 殼原封不動用它，不再多拿一張。
-        身分跟原本一樣（原本 GAS 也是認第一張 = 內層那張），還少一次連線。
-     ③ 「是不是平板」改看【殼走過哪裡】：載過 PIN 頁（page=field-pin）就是 PIN 工作階段。
-        記在記憶體 + 網址列 &home=pin（重整不丟）。
-        睡醒、shell-relogin → 一律回人頭頁（設備身分），不重載原頁。
-     ✕ 撤掉 v6b/v6c 的 WZ_PAD 判斷：
-        - 平板捷徑的 localStorage 裡根本沒有 WZ_PAD（?pad=1 只在 Safari 那邊寫過）
-        - 而且那條路走 index.html?pad=1，index.html 的平板分支會【直接跳出殼】
+   ══ v6f（2026/09/21）══ 開機畫面
+       正常載入：LOGO + 細光條，不寫字；超過 4 秒才冒「連線中…」。
+       錯誤畫面完全照舊。showSplash() 給載入用、showVeil() 給錯誤用，分開不混。
+       WAKE_MS 已改回 10 分鐘。
 
-   ══ v6 （2026/09/21）══ 睡醒重載（wake）：殼接 visibilitychange / pageshow，
-       在內層需要票之前先重載一輪。
-   ══ v5 （2026/09/16）══ SHELL_OK 加作業中心；?go=；shell-ping → shell-here（帶白名單）；
-       shell-nav 之後網址列改寫 ?go=。
+   ══ v6e（2026/09/21）══ PIN 頁自己報到 shell-ping {home:'pin'}
+       作業中心把平板送去 PIN 頁是在 iframe 裡換頁，殼看不到 → 改由 PIN 頁說。
+   ══ v6d（2026/09/21）══
+     ★ J 的真正病根：燒過的 rc 黏在 ?go= 上。
+        PIN 頁的卡片自己帶「人的碼」→ 殼把整串寫進 ?go= → 之後任何重載都重送那張死碼
+        → J → 退回人的共用票 →（逾時）B → D2。shell-relogin 在平板上從來救不起來。
+        修法：?go= 一律刮掉 rc；load() 接新碼前再刮一次。
+     ② 內層自己帶 rc → 原封不動用（loadAsIs），不再多拿一張。
+     ③ PIN 工作階段（PIN_HOME）睡醒、shell-relogin → 一律回人頭頁。
+     ✕ 撤掉 WZ_PAD 判斷：平板捷徑裡根本沒有這個旗標；而且 index.html?pad=1 會跳出殼。
+   ══ v6 （2026/09/21）══ 睡醒重載：殼接 visibilitychange / pageshow。
+   ══ v5 （2026/09/16）══ SHELL_OK 加作業中心；?go=；shell-ping → shell-here（帶白名單）。
+
+   詳見專案文件 claude/外殼v6-平板睡醒回人頭頁-2026-09-21.md
 
    ⚠ 內層 GAS 的每個 page 分支都要有
      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
      否則那一頁在殼裡會是一片空白。
    ════════════════════════════════════════════════════════════ */
 (function(){
-  var SHELL_VER = 'v6e';
+  var SHELL_VER = 'v6f';
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   // ★ 只准載自己人，而且只認「已經加過 ALLOWALL 的專案」。
   //   沒加那一行的專案嵌進來會是一片空白 —— 比掀殼更糟。
@@ -133,7 +162,20 @@
           return m ? decodeURIComponent(m.pop()) : ''; }
     catch(e){ return ''; }
   }
+
+  // ★2026/09/21 v6f　正常載入 → 開機畫面。超過 4 秒才補一行「連線中…」。
+  var _slowT = null;
+  function showSplash(){
+    clearTimeout(_slowT);
+    go.classList.remove('on');
+    veil.classList.remove('hide', 'slow');
+    veil.classList.add('splash');
+    _slowT = setTimeout(function(){ veil.classList.add('slow'); }, 4000);
+  }
+  // 錯誤畫面（逾時／失敗／未登入…）→ 收起開機畫面，文字 + 按鈕，跟以前一樣。
   function showVeil(title, detail, btnText, btnHref){
+    clearTimeout(_slowT);
+    veil.classList.remove('splash', 'slow');
     spin.style.display = detail ? 'none' : '';
     msg.textContent = title;
     sub.innerHTML = detail || '';
@@ -141,6 +183,11 @@
     else { go.classList.remove('on'); }
     veil.classList.remove('hide');
   }
+  function hideVeil(){
+    clearTimeout(_slowT);
+    veil.classList.add('hide');
+  }
+
   function safeUrl(u){
     u = String(u || '');
     if (u.indexOf('https://script.google.com/') !== 0) return '';
@@ -176,9 +223,8 @@
     catch(e){ return ''; }
   }
 
-  // ★2026/09/21 v6d　這個殼是不是「PIN 工作階段」。
-  //   判斷依據：殼有沒有載過 PIN 頁。不問 localStorage（平板捷徑那邊根本沒有旗標）。
-  //   記在網址列 &home=pin，所以重新整理也不會丟。
+  // ★2026/09/21 v6d/v6e　這個殼是不是「PIN 工作階段」。
+  //   來源：PIN 頁報到（主要）／殼載過 PIN 頁／網址列 &home=pin（重整不丟）。
   var PIN_HOME = false;
   try { PIN_HOME = new URLSearchParams(location.search).get('home') === 'pin'; } catch(e){}
   if (isPinUrl(outerGo())) PIN_HOME = true;
@@ -193,10 +239,8 @@
   var _lastRelogin = 0;   // ★ shell-relogin 冷卻（見下方 message 處理）
   var _netTry = 0;        // ★ 連線重試次數（見 load 的 catch）
 
-  // ★2026/09/21　睡醒重載用的兩個變數。
-  //   WAKE_MS：離開多久才算「睡過一覺」，短暫切出去不算。
-  //   ⚠⚠ 目前是【測試值 20 秒】。驗完務必改回 10 * 60 * 1000，
-  //      戳章上會一直顯示 wake=20s 提醒你。
+  // ★2026/09/21　睡醒重載：離開多久才算「睡過一覺」，短暫切出去不算。
+  //   ⚠ 測試時可暫時改成 20000（20 秒），驗完務必改回來。
   var WAKE_MS = 10 * 60 * 1000;
   var _hidAt  = 0;
 
@@ -228,7 +272,7 @@
     }
     target = stripRc(target);          // ★ v6d　舊網址上可能還黏著燒過的碼，接新的之前先刮乾淨
     if (isPinUrl(target) && !PIN_HOME){ PIN_HOME = true; stamp(); }
-    showVeil('連線中…', '');
+    showSplash();
     armWatchdog();
 
     var tok = getCk('WZ_TOKEN_CK');
@@ -261,7 +305,7 @@
         //   ⚠ 退避遞增，最多 3 次（約 9 秒）。真的不行才把畫面交給人。
         if (_netTry < 3) {
           _netTry++;
-          showVeil('連線中…', '');      // 維持轉圈，不要嚇到現場
+          showSplash();                 // 維持開機畫面，不要嚇到現場
           setTimeout(function(){ load(url); }, 1500 * _netTry);
           return;
         }
@@ -272,9 +316,8 @@
 
   // ★2026/09/21 v6d　內層自己帶了 rc（身分交接，例如 PIN 頁的人頭卡）→ 原封不動用它。
   //   原本殼會再接一張自己的，但 GAS 只認第一張 = 內層那張，所以身分跟原本一模一樣。
-  //   差別只是少燒一張碼、少一次連線。
   function loadAsIs(u){
-    showVeil('連線中…', '');
+    showSplash();
     armWatchdog();
     _netTry = 0;
     frame.src = u;
@@ -290,7 +333,7 @@
   frame.addEventListener('load', function(){
     if (!frame.src || frame.src === 'about:blank') return;
     clearTimeout(watchdog);
-    setTimeout(function(){ veil.classList.add('hide'); }, 350);
+    setTimeout(hideVeil, 350);
   });
 
   // ── ★2026/09/21　睡醒重載 ──────────────────────────────────
@@ -307,8 +350,6 @@
 
     // ★ PIN 工作階段（共用平板）：睡醒一律回人頭頁。
     //   離開這麼久，拿著平板的多半已經不是同一個人了。
-    //   ⚠ 放在 cookie 判斷之前：沒有 cookie 就讓 load() 顯示「尚未登入」，
-    //     也不要把上一個人的頁面留在畫面上。
     if (PIN_HOME){
       stamp('醒:回人頭');
       goHome();
@@ -344,7 +385,6 @@
       // ★2026/09/21 v6e　PIN 頁報到：「我是人頭頁」。
       //   作業中心把平板送去 PIN 頁是在 iframe 裡自己換頁，殼看不到（v6d 實測 home=--）。
       //   所以改由 PIN 頁自己說。到了就記住：這是 PIN 工作階段，家在人頭頁。
-      //   網址列也同步改成 PIN 頁，之後重整、重載都回這裡。
       if (d.home === 'pin'){
         PIN_HOME = true;
         markGo(PIN_URL);
