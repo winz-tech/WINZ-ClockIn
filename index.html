@@ -38,7 +38,7 @@
   //   ・殼只收 30 秒內的交棒，太舊（例如卡在保底鈕很久才按）就自己重拿，不會用到過期的碼。
   //   ・殼必須是 v6g 以上才認得交棒；舊殼會直接忽略，不會壞。
   //   ⚠ 要退版：WZ_HANDOFF 改成 false，秒退（回到 09/16 的行為）。
-  W.WZ_HANDOFF = false;
+  W.WZ_HANDOFF = true;
 
   document.documentElement.className = 'fast';   // ★ 立刻決定走哪條路，不閃畫面
   W._WZ_P = fetch(W.WZ_EXEC + '?page=validate&t=' + encodeURIComponent(tok)
