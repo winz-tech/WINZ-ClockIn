@@ -12,33 +12,47 @@
   var W = window;
   W.WZ_EXEC = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   W.WZ_TARGET = W.WZ_EXEC + '?page=punch';
+  // ★2026/09/16　有 cookie 的人走外殼 app.html（頂層留在 winz-tech.github.io）。
+  //   ⚠ 要退版：把 WZ_SHELL 改回 W.WZ_TARGET，秒退。
+  W.WZ_SHELL = 'app.html';
   function ck(k){ try{ var m=document.cookie.match('(^|;)\\s*'+k+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }catch(e){ return ''; } }
   function del(k){ try{ document.cookie = k+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){} }
   W._wzDel = del;
 
+  // ★2026/09/21　Chrome 的「可以安裝了」通知要越早接越好，錯過就沒了。先收起來，等使用者按按鈕再用。
+  W._WZ_BIP = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    W._WZ_BIP = e;
+    if (typeof W._wzOnBip === 'function') W._wzOnBip();
+  });
+
+  // ★2026/09/21　安裝模式：手機用「瀏覽器分頁」打開這一頁 → 不自動跳走，讓人先把 App 裝起來。
+  //   以前有票就一兩秒內自動跳進系統，人還來不及按安裝，只能靠 ?logout=1 繞路。
+  //   ・從桌面 App 打開（standalone）→ 照舊自動進入，天天打卡的人完全沒差
+  //   ・電腦瀏覽器 → 照舊自動進入
+  //   ・只有「手機 ＋ 瀏覽器分頁」才停在迎賓頁：多一顆「安裝打卡 App」，進入系統要自己按一下
+  var ua = navigator.userAgent || '';
+  var tp = navigator.maxTouchPoints || 0;
+  W._WZ_IOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && tp > 1);   // iPad 桌面模式也算
+  var mobile = W._WZ_IOS || /Android/.test(ua);
+  var standalone = false;
+  try { standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch(e){}
+  W._WZ_INSTALL = mobile && !standalone;
+
   if (location.search.indexOf('logout=1') > -1){
-    del('WZ_TOKEN_CK'); del('WZ_NAME_CK'); W._WZ_FAST = false; return;
+    del('WZ_TOKEN_CK'); del('WZ_NAME_CK'); W._WZ_FAST = false; W._WZ_HASTOK = false; return;
   }
   var tok = ck('WZ_TOKEN_CK');
   W._WZ_NAME = ck('WZ_NAME_CK');
+  W._WZ_HASTOK = !!tok;
   if (!tok){ W._WZ_FAST = false; return; }
+  if (W._WZ_INSTALL){ W._WZ_FAST = false; return; }   // ★ 安裝模式：停在迎賓頁
 
   W._WZ_FAST = true;
-  // ★2026/09/16　有 cookie 的人一律走外殼 app.html（頂層留在 winz-tech.github.io）。
-  //   app.html 沒帶 ?go= 時預設就是打卡，所以這裡什麼都不用帶。
-  //   ⚠ 只有「有 cookie」這條走殼。沒 cookie 的人走下面完整迎賓頁的 btnEnter，
-  //     那顆必須直接去 GAS 讓它跳 Google 登入 —— 送去 app.html 會被擋下來
-  //     說「尚未登入」然後丟回這一頁，無限迴圈。（btnEnter 那行不動。）
-  //   ⚠ 要退版：把 WZ_SHELL 改回 W.WZ_TARGET，秒退。
-  W.WZ_SHELL = 'app.html';
-
-  // ★2026/09/21　交棒：這裡本來就要問一次 validate，順便拿一張 rc 交給殼，
-  //   殼就不用再問第二次 —— 每個人每次進打卡省一趟 GAS（09/16 起一直在白等）。
-  //   ・rc 放在 # 後面：不會送到伺服器；殼一讀到就從網址列抹掉。
-  //   ・殼只收 30 秒內的交棒，太舊（例如卡在保底鈕很久才按）就自己重拿，不會用到過期的碼。
-  //   ・殼必須是 v6g 以上才認得交棒；舊殼會直接忽略，不會壞。
-  //   ⚠ 要退版：WZ_HANDOFF 改成 false，秒退（回到 09/16 的行為）。
-  W.WZ_HANDOFF = true;
+  // ★2026/09/21　交棒（validate 順便拿 rc 交給殼，省一趟 GAS）。
+  //   目前維持 false —— 一次只改一件事，這版穩了再改回 true。
+  W.WZ_HANDOFF = false;
 
   document.documentElement.className = 'fast';   // ★ 立刻決定走哪條路，不閃畫面
   W._WZ_P = fetch(W.WZ_EXEC + '?page=validate&t=' + encodeURIComponent(tok)
@@ -155,7 +169,7 @@ html.fast #welcome{ display:none; }
   box-shadow:0 0 0 rgba(0,0,0,0), 0 6px 0 rgba(0,0,0,.4); }
 .manual.wait .lab{ color:#8a8a92; letter-spacing:6px; }
 
-/* ══════ 完整迎賓（第一次 / 登出後）══════ */
+/* ══════ 完整迎賓（第一次 / 登出後 / 手機瀏覽器安裝模式）══════ */
 #welcome{ position:relative; z-index:10; text-align:center; width:100%; max-width:640px;
   padding:24px; display:flex; flex-direction:column; align-items:center; }
 .slash{ position:fixed; z-index:1; pointer-events:none;
@@ -206,6 +220,18 @@ html.fast .slash{ display:none; }
   padding-bottom:12px; margin-top:-10px; }
 @media (max-width:480px){ #welcome .enter .lab{ padding:16px 40px; font-size:18px; } }
 
+/* ★2026/09/21　安裝區：只有「手機 ＋ 瀏覽器分頁」才出現 */
+#installBox{ display:none; margin-top:26px; flex-direction:column; align-items:center; gap:12px;
+  opacity:0; animation:fadeUp .4s .52s forwards; }
+#installBox.show{ display:flex; }
+#btnInstall{ border:1px solid rgba(255,184,56,.7); background:rgba(255,184,56,.08); cursor:pointer;
+  color:#ffb838; font-family:var(--tc); font-weight:900; font-size:16px; letter-spacing:4px;
+  padding:13px 34px; border-radius:6px; }
+#btnInstall:active{ background:rgba(255,184,56,.2); }
+#btnInstall:focus-visible{ outline:2px solid #ffb838; outline-offset:3px; }
+#installHint{ font-size:13px; line-height:1.9; color:#9a9aa2; max-width:300px; }
+#installHint b{ color:#fff; font-weight:700; }
+
 @media (prefers-reduced-motion:reduce){
   *{ animation-duration:.01s !important; animation-iteration-count:1 !important; }
 }
@@ -248,6 +274,11 @@ html.fast .slash{ display:none; }
     <span class="lab">進入系統</span>
     <span class="en">// PRESS TO ENTER //</span>
   </a>
+  <!-- ★2026/09/21　安裝區（手機瀏覽器才顯示） -->
+  <div id="installBox">
+    <button type="button" id="btnInstall" style="display:none">安裝打卡 App</button>
+    <div id="installHint"></div>
+  </div>
 </div>
 
 <script>
@@ -263,9 +294,51 @@ html.fast .slash{ display:none; }
   tick(); setInterval(tick, 1000);
 
   // 手動路：真 <a>，iOS 靠真手勢導航（不用任何 JS 跳轉）
+  //   ⚠ 這一行不准動：沒 cookie 的人一定要直接去 GAS 讓它跳 Google 登入（送去殼會無限迴圈）
   document.getElementById('btnEnter').setAttribute('href', W.WZ_TARGET);
+  // ★2026/09/21　安裝模式而且「有票」→ 按進入系統走殼（跟桌面 App 一樣的路）。沒票的照上面那行。
+  if (W._WZ_INSTALL && W._WZ_HASTOK) {
+    document.getElementById('btnEnter').setAttribute('href', W.WZ_SHELL);
+  }
 
-  if (!W._WZ_FAST) return;   // 沒 cookie → 到此為止，看完整迎賓頁
+  // ★2026/09/21　安裝區
+  //   安卓：Chrome 給了「可以安裝」→ 顯示真的安裝按鈕，一按就跳系統的安裝視窗
+  //         沒給（已裝過、或 Chrome 還在判斷）→ 教他從右上角選單裝
+  //   iPhone：Safari 沒有安裝按鈕這種東西 → 教他「分享 → 加入主畫面」
+  if (W._WZ_INSTALL) {
+    var box  = document.getElementById('installBox');
+    var btn  = document.getElementById('btnInstall');
+    var hint = document.getElementById('installHint');
+    box.classList.add('show');
+    var AFTER = '裝好之後，從桌面的「出勤系統」圖示打開，<br>以後都會自動登入。';
+    function showBtn(){
+      btn.style.display = '';
+      hint.innerHTML = AFTER;
+    }
+    if (W._WZ_IOS) {
+      btn.style.display = 'none';
+      hint.innerHTML = '點 Safari 下方的<b>「分享」</b>→<b>「加入主畫面」</b><br>' + AFTER;
+    } else if (W._WZ_BIP) {
+      showBtn();
+    } else {
+      btn.style.display = 'none';
+      hint.innerHTML = '點 Chrome 右上角<b>「⋮」</b>→<b>「安裝應用程式」</b><br>' + AFTER;
+      W._wzOnBip = showBtn;          // Chrome 晚一點才給也接得到
+    }
+    btn.addEventListener('click', function(){
+      var p = W._WZ_BIP;
+      if (!p) return;
+      p.prompt();
+      p.userChoice.then(function(){ W._WZ_BIP = null; btn.style.display = 'none'; })
+                  .catch(function(){});
+    });
+    window.addEventListener('appinstalled', function(){
+      btn.style.display = 'none';
+      hint.innerHTML = '<b>安裝好了！</b>請回到桌面，從「出勤系統」圖示打開。';
+    });
+  }
+
+  if (!W._WZ_FAST) return;   // 沒 cookie／安裝模式 → 到此為止，看完整迎賓頁
 
   // ── 快速通道 ──
   var hi = document.getElementById('fastHi');
@@ -278,19 +351,18 @@ html.fast .slash{ display:none; }
   var g = h < 12 ? '早安' : (h < 18 ? '午安' : '晚安');
   hi.innerHTML = W._WZ_NAME ? (g + '，<b>' + String(W._WZ_NAME).replace(/[<>&]/g,'') + '</b>') : g;
 
-  // ★2026/09/16　保底鈕也指外殼。走到這裡代表 cookie 一定在（_WZ_FAST 才會是 true），
-  //   所以 app.html 進得去；validate 回來也是同一個網址，不用再換。
+  // ★2026/09/16　保底鈕也指外殼。走到這裡代表 cookie 一定在。
   man.setAttribute('href', W.WZ_SHELL);
 
   function go(url){
     if (gone) return; gone = true;
     bar.className = 'fbar done';
     man.querySelector('.lab').textContent = '進入中…';
-    man.style.pointerEvents = 'none';   // ★ 已經在跳了，防連點（此時點不點都一樣）
+    man.style.pointerEvents = 'none';   // ★ 已經在跳了，防連點
     location.replace(url);
-    // iOS PWA 可能吞掉 replace → 200ms 後還在就把大鈕推出來（坑B：蘋果留手按路）
+    // iOS PWA 可能吞掉 replace → 3 秒後還在就把大鈕推出來（坑B：蘋果留手按路）
     setTimeout(function(){
-      if (document.visibilityState === 'visible'){   // 真的還停在這頁才推鈕（跳成功的人不會看到）
+      if (document.visibilityState === 'visible'){
         _ready(); man.classList.add('show'); msg.textContent = '點一下繼續 →';
       }
     }, 3000);
@@ -302,7 +374,7 @@ html.fast .slash{ display:none; }
   }
   W._WZ_P.then(function(url){
     if (url){ man.setAttribute('href', url); _ready(); go(url); return; }
-    if (url === ''){       // token 失效 → 退回完整迎賓，講清楚為什麼
+    if (url === ''){       // token 失效 → 退回完整迎賓
       document.documentElement.className = '';
       return;
     }
@@ -311,9 +383,7 @@ html.fast .slash{ display:none; }
     _ready(); man.classList.add('show');
   });
 
-  // 保底：4 秒還沒走才浮出真 <a> 大鈕
-  //   ★ 正常 1~2 秒就自動進去了，這顆平常不該被看到
-  //   ★ 但不能拿掉：iOS PWA 程式化跳轉會被 WebKit 靜默吞（坑B），這是唯一出路
+  // 保底：8 秒還沒走才浮出真 <a> 大鈕（iOS PWA 程式化跳轉會被吞，這是唯一出路）
   setTimeout(function(){
     if (!gone) { _ready(); man.classList.add('show'); }
   }, 8000);
