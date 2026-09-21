@@ -39,6 +39,10 @@
     font-size:16px;font-weight:bold;letter-spacing:3px;
     box-shadow:0 0 20px rgba(227,6,19,.4)}
   .btn.on{display:inline-block}
+  /* ★2026/09/21　量測品：殼的版號戳章。穩定之後整段拿掉（連同 body 裡的 #shellStamp）。 */
+  #shellStamp{position:fixed;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+    z-index:20;pointer-events:none;
+    font:10px/1.2 ui-monospace,Menlo,Consolas,monospace;color:rgba(255,255,255,.4)}
 </style>
 </head>
 <body>
@@ -60,9 +64,11 @@
   <a class="btn" id="go" href="index.html">前往登入</a>
 </div>
 
+<div id="shellStamp"></div>
+
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v6　2026/09/21
+   app.html　外殼　v6d　2026/09/21
    ── portal/ 與 WINZ-ClockIn/ 放的是「同一份檔案」，沒有寫死資料夾名字。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
@@ -70,31 +76,35 @@
      ② script.google.com 那條白色橫幅只在頂層才長得出來 → 包進來就沒了
      ③ ★ 每次載入都現拿一張新鮮的 rc 注進 iframe ——
         內層那個 googleusercontent origin 的 localStorage 就算被 iOS 清掉也沒差。
-        （2026/09/16 抓到的 A1+D2 就是死在「網址上那張 rc 已經用過／過期」。）
 
-   ══ v6 改了什麼（2026/09/21）══
-     ★ 睡醒重載（wake）。病根：
-       frame.src 上那張 rc 會一直留著。iOS 把分頁凍結、記憶體回收之後再喚醒，
-       它會【照著 src 重新載入一次】—— 同一張燒過的碼又送一次 → J（換碼失敗）
-       → 退回本機那張已逾時的共用票 → B → 補票 iframe 沒回話 → D2。
-       而這整段期間【殼的 JS 沒有重新執行】，load() 不會跑，
-       新鮮的 rc 永遠不會被注進去。只能等內層先撞牆才喊 shell-relogin，
-       那時候人已經看到紅牆了，網路又多半還沒接回來。
-       修法：殼自己接住 visibilitychange / pageshow，在內層需要票之前先重載一輪。
+   ══ v6d 改了什麼（2026/09/21）══
+     ★① J 的真正病根：燒過的 rc 黏在 ?go= 上
+        平板 PIN 頁的卡片會自己帶一張「這個人」的 rc。點下去 → shell-nav →
+        殼把【整串含 rc】寫進 ?go=，再接一張自己的 → 兩張 rc，GAS 只認第一張。
+        第一次沒事；之後任何重載（睡醒／shell-relogin）都從 ?go= 讀回那張
+        【早就燒掉的人的碼】→ J → 退回本機人的共用票 →（逾時）B → D2。
+        shell-relogin 在平板上從來救不起來，就是因為它每次都重送同一張死碼。
+        修法：?go= 一律刮掉 rc；load() 接新碼前再刮一次。
+     ② 內層自己帶了 rc（身分交接）→ 殼原封不動用它，不再多拿一張。
+        身分跟原本一樣（原本 GAS 也是認第一張 = 內層那張），還少一次連線。
+     ③ 「是不是平板」改看【殼走過哪裡】：載過 PIN 頁（page=field-pin）就是 PIN 工作階段。
+        記在記憶體 + 網址列 &home=pin（重整不丟）。
+        睡醒、shell-relogin → 一律回人頭頁（設備身分），不重載原頁。
+     ✕ 撤掉 v6b/v6c 的 WZ_PAD 判斷：
+        - 平板捷徑的 localStorage 裡根本沒有 WZ_PAD（?pad=1 只在 Safari 那邊寫過）
+        - 而且那條路走 index.html?pad=1，index.html 的平板分支會【直接跳出殼】
 
-   ══ v5 改了什麼（2026/09/16）══
-     ① SHELL_OK 加入「作業中心」的部署碼
-     ② 新增 ?go=<GAS 網址>：外層指定要載哪一支（仍要過 SHELL_OK）
-        沒帶 go → 行為跟 v4 一模一樣（打卡專案 + ?page=）
-        ⚠ 所以貼完這一份，WINZ-ClockIn 捷徑一個像素都不會變
-     ③ 新增 shell-ping → 回 shell-here，★連白名單一起交給內層★
-     ④ shell-nav 之後網址列改寫 ?go=（原本寫 ?page=，重整會掉回打卡的同名頁）
+   ══ v6 （2026/09/21）══ 睡醒重載（wake）：殼接 visibilitychange / pageshow，
+       在內層需要票之前先重載一輪。
+   ══ v5 （2026/09/16）══ SHELL_OK 加作業中心；?go=；shell-ping → shell-here（帶白名單）；
+       shell-nav 之後網址列改寫 ?go=。
 
    ⚠ 內層 GAS 的每個 page 分支都要有
      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
      否則那一頁在殼裡會是一片空白。
    ════════════════════════════════════════════════════════════ */
 (function(){
+  var SHELL_VER = 'v6e';
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   // ★ 只准載自己人，而且只認「已經加過 ALLOWALL 的專案」。
   //   沒加那一行的專案嵌進來會是一片空白 —— 比掀殼更糟。
@@ -106,6 +116,10 @@
     //   doGet 的 _render() 每一頁都有 ALLOWALL，已逐條確認。
     'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'    // 領料單（2026/09/18 加）
   ];
+
+  // ★2026/09/21 v6d　PIN 人頭頁（跟 portal/index.html 的 PIN_URL 同一個）
+  var PIN_ID  = 'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB';
+  var PIN_URL = 'https://script.google.com/a/macros/winz-tech.com/s/' + PIN_ID + '/exec?page=field-pin';
 
   var frame = document.getElementById('frame');
   var veil  = document.getElementById('veil');
@@ -134,6 +148,23 @@
     return (SHELL_OK.indexOf(id) > -1) ? u : '';
   }
 
+  // ★2026/09/21 v6d　把網址上所有 rc= 刮掉。
+  //   rc 用過即焚，留在任何會被「重讀」的地方（?go=、iframe src）都是定時炸彈。
+  //   ⚠ 前面一定要是 ? 或 &，才不會誤刮到 src= 之類的參數。
+  function stripRc(u){
+    return String(u || '')
+      .replace(/([?&])rc=[^&#]*(&?)/g, function(m, p, amp){ return amp ? p : ''; })
+      .replace(/[?&]$/, '');
+  }
+  function hasRc(u){ return /[?&]rc=[^&#]/.test(String(u || '')); }
+
+  // ★2026/09/21 v6d　是不是 PIN 人頭頁（比部署碼 + page=field-pin）
+  function isPinUrl(u){
+    u = String(u || '');
+    var id = (u.match(/\/s\/([^\/?]+)/) || [])[1] || '';
+    return id === PIN_ID && /[?&]page=field-pin(&|#|$)/.test(u);
+  }
+
   function outerPage(){
     try { return new URLSearchParams(location.search).get('page') || 'punch'; }
     catch(e){ return 'punch'; }
@@ -145,15 +176,48 @@
     catch(e){ return ''; }
   }
 
+  // ★2026/09/21 v6d　這個殼是不是「PIN 工作階段」。
+  //   判斷依據：殼有沒有載過 PIN 頁。不問 localStorage（平板捷徑那邊根本沒有旗標）。
+  //   記在網址列 &home=pin，所以重新整理也不會丟。
+  var PIN_HOME = false;
+  try { PIN_HOME = new URLSearchParams(location.search).get('home') === 'pin'; } catch(e){}
+  if (isPinUrl(outerGo())) PIN_HOME = true;
+
+  // 網址列只寫【乾淨的】網址，PIN 工作階段多掛 &home=pin
+  function markGo(cleanUrl){
+    try { history.replaceState(null, '', '?go=' + encodeURIComponent(cleanUrl)
+                                         + (PIN_HOME ? '&home=pin' : '')); } catch(e){}
+  }
+
   var watchdog = null;
   var _lastRelogin = 0;   // ★ shell-relogin 冷卻（見下方 message 處理）
   var _netTry = 0;        // ★ 連線重試次數（見 load 的 catch）
 
   // ★2026/09/21　睡醒重載用的兩個變數。
   //   WAKE_MS：離開多久才算「睡過一覺」，短暫切出去不算。
-  //   ⚠ 測試的時候把它改成 20000（20 秒），驗完務必改回 10 * 60 * 1000。
+  //   ⚠⚠ 目前是【測試值 20 秒】。驗完務必改回 10 * 60 * 1000，
+  //      戳章上會一直顯示 wake=20s 提醒你。
   var WAKE_MS = 10 * 60 * 1000;
   var _hidAt  = 0;
+
+  // ★2026/09/21　量測品：版號戳章。穩定之後整支拿掉。
+  var _stampExtra = '';
+  function stamp(extra){
+    if (extra !== undefined) _stampExtra = extra;
+    var el = document.getElementById('shellStamp');
+    if (!el) return;
+    el.textContent = 'shell ' + SHELL_VER
+                   + ' · home=' + (PIN_HOME ? 'PIN' : '--')
+                   + ' · wake=' + Math.round(WAKE_MS / 1000) + 's'
+                   + (_stampExtra ? ' · ' + _stampExtra : '');
+  }
+
+  function armWatchdog(){
+    clearTimeout(watchdog);
+    watchdog = setTimeout(function(){
+      showVeil('連線逾時', '網路慢或系統忙碌，<br>可以再試一次。', '重新載入', 'javascript:location.reload()');
+    }, 20000);
+  }
 
   function load(url){
     var want   = url || outerGo();
@@ -162,11 +226,10 @@
       showVeil('無法開啟', '這個位置不在允許範圍內。', '回首頁', 'index.html');
       return;
     }
+    target = stripRc(target);          // ★ v6d　舊網址上可能還黏著燒過的碼，接新的之前先刮乾淨
+    if (isPinUrl(target) && !PIN_HOME){ PIN_HOME = true; stamp(); }
     showVeil('連線中…', '');
-    clearTimeout(watchdog);
-    watchdog = setTimeout(function(){
-      showVeil('連線逾時', '網路慢或系統忙碌，<br>可以再試一次。', '重新載入', 'javascript:location.reload()');
-    }, 20000);
+    armWatchdog();
 
     var tok = getCk('WZ_TOKEN_CK');
     if (!tok){
@@ -207,6 +270,23 @@
       });
   }
 
+  // ★2026/09/21 v6d　內層自己帶了 rc（身分交接，例如 PIN 頁的人頭卡）→ 原封不動用它。
+  //   原本殼會再接一張自己的，但 GAS 只認第一張 = 內層那張，所以身分跟原本一模一樣。
+  //   差別只是少燒一張碼、少一次連線。
+  function loadAsIs(u){
+    showVeil('連線中…', '');
+    armWatchdog();
+    _netTry = 0;
+    frame.src = u;
+  }
+
+  // ★2026/09/21 v6d　回人頭頁：用殼的 cookie（設備帳號）換新碼載 PIN 頁。
+  function goHome(){
+    PIN_HOME = true;
+    markGo(PIN_URL);
+    load(PIN_URL);
+  }
+
   frame.addEventListener('load', function(){
     if (!frame.src || frame.src === 'about:blank') return;
     clearTimeout(watchdog);
@@ -214,23 +294,32 @@
   });
 
   // ── ★2026/09/21　睡醒重載 ──────────────────────────────────
-  //   為什麼一定要在【殼】這層做：
-  //     iOS 喚醒被凍結的分頁時，是照著 iframe 現有的 src 重新載入一次。
-  //     那個 src 上的 rc 早就燒掉了（J），而殼的 JS 沒有重跑，
-  //     所以沒有任何人會去拿新的碼 —— 只能等內層撞牆才補救，那太晚了。
-  //   這兩個事件就算 JS 被凍結，解凍後還是會送到，是殼唯一的醒來訊號。
+  //   iOS 喚醒被凍結的分頁時，是照著 iframe 現有的 src 重新載入一次 ——
+  //   而殼的 JS 沒有重跑，沒有人會去拿新的碼。這兩個事件是殼唯一的醒來訊號。
   function wake(){
     if (!_hidAt) return;
     var away = Date.now() - _hidAt;
     _hidAt = 0;
     if (away < WAKE_MS) return;              // ⚠ 切出去看個訊息就回來 → 不動它。
                                              //   現場填到一半的發料登記不能被洗掉。
-    if (!getCk('WZ_TOKEN_CK')) return;       // ⚠ 沒有第一方 cookie 就不要碰。
-                                             //   不然 cookie 過期但內層還活著的人，
-                                             //   會被我們從「還能用」打成「尚未登入」—— 那是新病。
     _lastRelogin = Date.now();               // ★ 剛注完新碼，壓住內層 30 秒內的 shell-relogin
     _netTry = 0;
-    load();                                  // 不帶參數 → 從網址列重新推導，就是目前這一頁
+
+    // ★ PIN 工作階段（共用平板）：睡醒一律回人頭頁。
+    //   離開這麼久，拿著平板的多半已經不是同一個人了。
+    //   ⚠ 放在 cookie 判斷之前：沒有 cookie 就讓 load() 顯示「尚未登入」，
+    //     也不要把上一個人的頁面留在畫面上。
+    if (PIN_HOME){
+      stamp('醒:回人頭');
+      goHome();
+      return;
+    }
+    if (!getCk('WZ_TOKEN_CK')) { stamp('醒:無cookie'); return; }
+                                             // ⚠ 沒有第一方 cookie 就不要碰。
+                                             //   不然 cookie 過期但內層還活著的人，
+                                             //   會被我們從「還能用」打成「尚未登入」—— 那是新病。
+    stamp('醒:重載');
+    load();                                  // 不帶參數 → 從網址列重新推導（已是乾淨網址）
   }
   document.addEventListener('visibilitychange', function(){
     if (document.hidden) _hidAt = Date.now(); else wake();
@@ -246,31 +335,34 @@
     var d = ev.data; if (!d) return;
 
     // ★2026/09/16　「有沒有殼？」內層開頁問一次。
-    //   ★★ 連白名單一起交出去 —— 這是關鍵：
-    //      內層必須在「手指按下去的那一瞬間、同步」就知道這個網址殼接不接得住。
-    //      不能用「先 postMessage 再等 250ms」—— 那會脫離手勢，iOS 會靜默吞掉導航，
-    //      卡片就變成點了沒反應（比掀殼糟得多）。
+    //   ★★ 連白名單一起交出去 —— 內層必須在「手指按下去的那一瞬間、同步」
+    //      就知道這個網址殼接不接得住，不能先問再等（iOS 會吞掉脫離手勢的導航）。
     //   ⚠ 回 shell-here 不回 shell-ack：01-auth 的 wzGo 在等 shell-ack，
     //      借用同一個字會讓它誤判「殼接住了」。
     if (d.wz === 'shell-ping'){
       try { ev.source.postMessage({ wz:'shell-here', ok: SHELL_OK.slice() }, o); } catch(e){}
+      // ★2026/09/21 v6e　PIN 頁報到：「我是人頭頁」。
+      //   作業中心把平板送去 PIN 頁是在 iframe 裡自己換頁，殼看不到（v6d 實測 home=--）。
+      //   所以改由 PIN 頁自己說。到了就記住：這是 PIN 工作階段，家在人頭頁。
+      //   網址列也同步改成 PIN 頁，之後重整、重載都回這裡。
+      if (d.home === 'pin'){
+        PIN_HOME = true;
+        markGo(PIN_URL);
+        stamp('');
+      }
       return;
     }
 
-    // ★2026/09/20　內層喊「我沒票了」→ 殼重新 load()，注一張新鮮的 rc。
-    //   為什麼這條是必要的：內層的登入牆是用 JS 蓋一層 div 上去的，不是新導航
-    //   → iframe 不會再觸發 load → 殼完全看不見內層已經掛了。
-    //   殼手上有 github.io 的第一方 cookie（設備帳號），隨時換得到新鮮 rc，
-    //   所以「人的票逾時」可以自動退回設備身分，使用者只看到畫面閃一下。
-    //   ⚠ 一定要有冷卻：殼重載 → 內層還是沒票 → 又喊 → 無限迴圈。
-    //     30 秒內只受理一次；冷卻中不理會，內層就照原流程去跳登入牆。
+    // ★2026/09/20　內層喊「我沒票了」→ 殼重新載入，注一張新鮮的 rc。
+    //   ⚠ 一定要有冷卻：殼重載 → 內層還是沒票 → 又喊 → 無限迴圈。30 秒內只受理一次。
     //   ⚠ 不要回 ack —— wzGo 在等 shell-ack，回了會讓它誤判。
-    //   ★2026/09/21 起這條變成【第二道】：正常情況 wake() 已經先補好票了。
+    //   ★2026/09/21 v6d　PIN 工作階段 → 回人頭頁（人的票 30 分鐘到期就是走這條）。
     if (d.wz === 'shell-relogin'){
       var _nowT = Date.now();
       if (_nowT - _lastRelogin < 30000) return;
       _lastRelogin = _nowT;
-      load();          // 不帶參數 → 從網址列的 ?go= / ?page= 重新推導，剛好是目前這一頁
+      if (PIN_HOME) { stamp('沒票:回人頭'); goHome(); }
+      else          { stamp('沒票:重載');   load();   }
       return;
     }
 
@@ -279,9 +371,12 @@
       // ★ 不在名單上就「不要回 ack」——讓內層逾時後自己頂層跳出去。
       if (!u) return;
       try { ev.source.postMessage({ wz:'shell-ack' }, o); } catch(e){}
-      // ★2026/09/16 改寫 ?go= 不寫 ?page= —— 原本重新整理會掉回「打卡專案的同名頁」
-      try { history.replaceState(null, '', '?go=' + encodeURIComponent(u)); } catch(e){}
-      load(u);
+      if (isPinUrl(u)) PIN_HOME = true;
+      // ★ v6d　網址列只寫乾淨的網址 —— 這一行就是 J 的解藥
+      markGo(stripRc(u));
+      stamp('');
+      if (hasRc(u)) loadAsIs(u);             // 內層自己帶了身分 → 原封不動用
+      else          load(u);                 // 沒帶 → 殼用 cookie 換一張
       return;
     }
 
@@ -293,6 +388,9 @@
     }
   });
 
+  // 開機時網址列可能還是舊版殼寫的髒網址 → 先洗乾淨
+  if (outerGo() && hasRc(outerGo())) markGo(stripRc(outerGo()));
+  stamp();
   load();
 })();
 </script>
