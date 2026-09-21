@@ -8,6 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="穎利ERP">
+<!-- ★2026/09/21 v6g　預先連線：頁面一開就先跟 Google 握手，第一趟 fetch／iframe 不用再等 TLS。
+     validate 是 ContentService，會 302 到 script.googleusercontent.com，所以兩個都要。 -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <!-- ★2026/09/17　分頁圖示。以前頂層是 script.google.com，只能用 Google 的圖示；
      現在頂層停在自己家，這一行才生效。 -->
@@ -83,10 +88,11 @@
         referrerpolicy="no-referrer-when-downgrade"
         allow="geolocation; camera; clipboard-write"></iframe></div>
 
-<!-- ★ v6f　一開始就是 splash，第一格畫面不會再閃「連線中…」 -->
+<!-- ★ v6f　一開始就是 splash，第一格畫面不會再閃「連線中…」
+     ★ LOGO 用根目錄路徑：portal/ 和 WINZ-ClockIn/ 兩個殼讀同一張；讀不到退回 icon-192.png -->
 <div id="veil" class="splash">
-    <img id="splashLogo" src="/portal/winz-logo.png" alt="穎利科技 WINZ"
-       onerror="this.onerror=null;this.src='icon-192.png'">
+  <img id="splashLogo" src="/portal/winz-logo.png" alt="穎利科技 WINZ"
+       onerror="this.onerror=null;this.src='winz-logo.png'">
   <div class="bar"><i></i></div>
   <div class="slow">連線中…</div>
   <div class="spin" id="spin"></div>
@@ -99,7 +105,7 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v6f　2026/09/21
+   app.html　外殼　v6g　2026/09/21
    ── portal/ 與 WINZ-ClockIn/ 放的是「同一份檔案」，沒有寫死資料夾名字。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
@@ -108,21 +114,22 @@
      ③ ★ 每次載入都現拿一張新鮮的 rc 注進 iframe ——
         內層那個 googleusercontent origin 的 localStorage 就算被 iOS 清掉也沒差。
 
-   ══ v6f（2026/09/21）══ 開機畫面
-       正常載入：LOGO + 細光條，不寫字；超過 4 秒才冒「連線中…」。
-       錯誤畫面完全照舊。showSplash() 給載入用、showVeil() 給錯誤用，分開不混。
-       WAKE_MS 已改回 10 分鐘。
+   ══ v6g（2026/09/21）══ 開機變快
+     ① 首頁交棒：index.html 已經 validate 過一次、手上有一張 rc，
+        以前丟掉，殼再問一次 → 每次進系統白白多一趟 GAS。
+        現在首頁把 rc 放在 #rc=…&at=… 交給殼（# 後面不會送到伺服器），
+        殼第一次載入直接用，不再 fetch。
+        ⚠ 超過 30 秒的交棒不用（中間可能卡在推播詢問卡），自己重拿。
+        ⚠ 一讀到就把 # 從網址列抹掉 —— 燒過的碼不能留在會被重讀的地方。
+     ② 內層 shell-ping 一到就收開機畫面（作業中心／PIN 頁會報到），
+        不必等 iframe 所有圖片字型都載完。打卡頁不報到 → 照舊等 load。
+     ③ preconnect 預先跟 Google 握手。
+     ④ 戳章多印「驗」「開」兩個秒數（量測品）。
 
-   ══ v6e（2026/09/21）══ PIN 頁自己報到 shell-ping {home:'pin'}
-       作業中心把平板送去 PIN 頁是在 iframe 裡換頁，殼看不到 → 改由 PIN 頁說。
-   ══ v6d（2026/09/21）══
-     ★ J 的真正病根：燒過的 rc 黏在 ?go= 上。
-        PIN 頁的卡片自己帶「人的碼」→ 殼把整串寫進 ?go= → 之後任何重載都重送那張死碼
-        → J → 退回人的共用票 →（逾時）B → D2。shell-relogin 在平板上從來救不起來。
-        修法：?go= 一律刮掉 rc；load() 接新碼前再刮一次。
-     ② 內層自己帶 rc → 原封不動用（loadAsIs），不再多拿一張。
-     ③ PIN 工作階段（PIN_HOME）睡醒、shell-relogin → 一律回人頭頁。
-     ✕ 撤掉 WZ_PAD 判斷：平板捷徑裡根本沒有這個旗標；而且 index.html?pad=1 會跳出殼。
+   ══ v6f（2026/09/21）══ 開機畫面：LOGO + 細光條；超過 4 秒才冒「連線中…」；錯誤畫面照舊。
+   ══ v6e（2026/09/21）══ PIN 頁自己報到 shell-ping {home:'pin'}。
+   ══ v6d（2026/09/21）══ J 的病根：燒過的 rc 黏在 ?go= 上 → 一律刮掉；
+       內層自帶 rc 原封不動用；PIN 工作階段睡醒／沒票一律回人頭頁；撤掉 WZ_PAD 判斷。
    ══ v6 （2026/09/21）══ 睡醒重載：殼接 visibilitychange / pageshow。
    ══ v5 （2026/09/16）══ SHELL_OK 加作業中心；?go=；shell-ping → shell-here（帶白名單）。
 
@@ -133,7 +140,7 @@
      否則那一頁在殼裡會是一片空白。
    ════════════════════════════════════════════════════════════ */
 (function(){
-  var SHELL_VER = 'v6f';
+  var SHELL_VER = 'v6g';
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   // ★ 只准載自己人，而且只認「已經加過 ALLOWALL 的專案」。
   //   沒加那一行的專案嵌進來會是一片空白 —— 比掀殼更糟。
@@ -157,6 +164,22 @@
   var sub   = document.getElementById('sub');
   var go    = document.getElementById('go');
 
+  // ★2026/09/21 v6g　首頁交棒的 rc（只給第一次載入用）
+  //   格式：app.html?go=…#rc=XXXX&at=<毫秒時間戳>
+  var HANDOFF = '';
+  (function(){
+    try {
+      var h  = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+      var rc = h.get('rc') || '';
+      var at = Number(h.get('at') || 0);
+      if (rc && at > 0 && (Date.now() - at) < 30000) HANDOFF = rc;
+    } catch(e){}
+    // ★ 不管用不用，# 一律先抹掉 —— 燒過的碼不能留在網址列（重整會重送）
+    if (location.hash) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+    }
+  })();
+
   function getCk(k){
     try { var m = document.cookie.match('(^|;)\\s*' + k + '\\s*=\\s*([^;]+)');
           return m ? decodeURIComponent(m.pop()) : ''; }
@@ -175,6 +198,7 @@
   // 錯誤畫面（逾時／失敗／未登入…）→ 收起開機畫面，文字 + 按鈕，跟以前一樣。
   function showVeil(title, detail, btnText, btnHref){
     clearTimeout(_slowT);
+    _awaitFrame = false;
     veil.classList.remove('splash', 'slow');
     spin.style.display = detail ? 'none' : '';
     msg.textContent = title;
@@ -204,6 +228,7 @@
       .replace(/[?&]$/, '');
   }
   function hasRc(u){ return /[?&]rc=[^&#]/.test(String(u || '')); }
+  function addRc(u, rc){ return u + (u.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(rc); }
 
   // ★2026/09/21 v6d　是不是 PIN 人頭頁（比部署碼 + page=field-pin）
   function isPinUrl(u){
@@ -244,6 +269,13 @@
   var WAKE_MS = 10 * 60 * 1000;
   var _hidAt  = 0;
 
+  // ★2026/09/21 v6g　量測：這一輪載入花在哪。
+  var _t0 = 0;             // 開始載入
+  var _tVal = '';          // 驗：殼問後端花多久（或「交棒」）
+  var _tOpen = '';         // 開：從開始到畫面可用
+  var _awaitFrame = false; // 已經設了 frame.src、還在等內層出現
+  function secs(ms){ return (ms / 1000).toFixed(1) + 's'; }
+
   // ★2026/09/21　量測品：版號戳章。穩定之後整支拿掉。
   var _stampExtra = '';
   function stamp(extra){
@@ -252,7 +284,8 @@
     if (!el) return;
     el.textContent = 'shell ' + SHELL_VER
                    + ' · home=' + (PIN_HOME ? 'PIN' : '--')
-                   + ' · wake=' + Math.round(WAKE_MS / 1000) + 's'
+                   + (_tVal  ? ' · 驗' + _tVal  : '')
+                   + (_tOpen ? ' · 開' + _tOpen : '')
                    + (_stampExtra ? ' · ' + _stampExtra : '');
   }
 
@@ -263,6 +296,20 @@
     }, 20000);
   }
 
+  // 設 iframe 並開始等它出現
+  function setFrame(u){
+    _awaitFrame = true;
+    frame.src = u;
+  }
+  // ★ v6g　內層出現了（shell-ping 或 iframe load，誰先到算誰）→ 收開機畫面
+  function frameReady(){
+    if (!_awaitFrame) return;
+    _awaitFrame = false;
+    clearTimeout(watchdog);
+    if (_t0) { _tOpen = secs(Date.now() - _t0); stamp(); }
+    setTimeout(hideVeil, 150);
+  }
+
   function load(url){
     var want   = url || outerGo();
     var target = want ? safeUrl(want) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
@@ -271,7 +318,8 @@
       return;
     }
     target = stripRc(target);          // ★ v6d　舊網址上可能還黏著燒過的碼，接新的之前先刮乾淨
-    if (isPinUrl(target) && !PIN_HOME){ PIN_HOME = true; stamp(); }
+    if (isPinUrl(target) && !PIN_HOME){ PIN_HOME = true; }
+    _t0 = Date.now(); _tVal = ''; _tOpen = ''; stamp();
     showSplash();
     armWatchdog();
 
@@ -279,6 +327,15 @@
     if (!tok){
       clearTimeout(watchdog);
       showVeil('尚未登入', '請先從首頁登入一次，<br>之後這裡就會自動進入。', '前往登入', 'index.html');
+      return;
+    }
+
+    // ★ v6g　首頁交棒：直接用，不再問後端。只用一次。
+    if (HANDOFF){
+      var hc = HANDOFF; HANDOFF = '';
+      _tVal = '交棒'; stamp();
+      _netTry = 0;
+      setFrame(addRc(target, hc));
       return;
     }
 
@@ -291,10 +348,11 @@
           showVeil('登入已失效', '請重新登入一次。', '前往登入', 'index.html');
           return;
         }
+        _tVal = secs(Date.now() - _t0); stamp();
         var u = target;
-        if (d.rc) u += (u.indexOf('?') > -1 ? '&' : '?') + 'rc=' + encodeURIComponent(d.rc);
+        if (d.rc) u = addRc(u, d.rc);
         _netTry = 0;                    // ★ 通了就歸零
-        frame.src = u;
+        setFrame(u);
       })
       .catch(function(){
         clearTimeout(watchdog);
@@ -317,10 +375,11 @@
   // ★2026/09/21 v6d　內層自己帶了 rc（身分交接，例如 PIN 頁的人頭卡）→ 原封不動用它。
   //   原本殼會再接一張自己的，但 GAS 只認第一張 = 內層那張，所以身分跟原本一模一樣。
   function loadAsIs(u){
+    _t0 = Date.now(); _tVal = '內層'; _tOpen = ''; stamp();
     showSplash();
     armWatchdog();
     _netTry = 0;
-    frame.src = u;
+    setFrame(u);
   }
 
   // ★2026/09/21 v6d　回人頭頁：用殼的 cookie（設備帳號）換新碼載 PIN 頁。
@@ -332,8 +391,7 @@
 
   frame.addEventListener('load', function(){
     if (!frame.src || frame.src === 'about:blank') return;
-    clearTimeout(watchdog);
-    setTimeout(hideVeil, 350);
+    frameReady();
   });
 
   // ── ★2026/09/21　睡醒重載 ──────────────────────────────────
@@ -388,8 +446,10 @@
       if (d.home === 'pin'){
         PIN_HOME = true;
         markGo(PIN_URL);
-        stamp('');
       }
+      // ★2026/09/21 v6g　內層已經跑起來了 → 收開機畫面，不必等所有圖片字型
+      frameReady();
+      stamp();
       return;
     }
 
@@ -414,7 +474,7 @@
       if (isPinUrl(u)) PIN_HOME = true;
       // ★ v6d　網址列只寫乾淨的網址 —— 這一行就是 J 的解藥
       markGo(stripRc(u));
-      stamp('');
+      _stampExtra = '';
       if (hasRc(u)) loadAsIs(u);             // 內層自己帶了身分 → 原封不動用
       else          load(u);                 // 沒帶 → 殼用 cookie 換一張
       return;
