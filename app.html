@@ -62,7 +62,7 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v5　2026/09/16
+   app.html　外殼　v6　2026/09/21
    ── portal/ 與 WINZ-ClockIn/ 放的是「同一份檔案」，沒有寫死資料夾名字。
 
    在做什麼：把 GAS 包進 iframe，頂層永遠停在 winz-tech.github.io。
@@ -71,6 +71,16 @@
      ③ ★ 每次載入都現拿一張新鮮的 rc 注進 iframe ——
         內層那個 googleusercontent origin 的 localStorage 就算被 iOS 清掉也沒差。
         （2026/09/16 抓到的 A1+D2 就是死在「網址上那張 rc 已經用過／過期」。）
+
+   ══ v6 改了什麼（2026/09/21）══
+     ★ 睡醒重載（wake）。病根：
+       frame.src 上那張 rc 會一直留著。iOS 把分頁凍結、記憶體回收之後再喚醒，
+       它會【照著 src 重新載入一次】—— 同一張燒過的碼又送一次 → J（換碼失敗）
+       → 退回本機那張已逾時的共用票 → B → 補票 iframe 沒回話 → D2。
+       而這整段期間【殼的 JS 沒有重新執行】，load() 不會跑，
+       新鮮的 rc 永遠不會被注進去。只能等內層先撞牆才喊 shell-relogin，
+       那時候人已經看到紅牆了，網路又多半還沒接回來。
+       修法：殼自己接住 visibilitychange / pageshow，在內層需要票之前先重載一輪。
 
    ══ v5 改了什麼（2026/09/16）══
      ① SHELL_OK 加入「作業中心」的部署碼
@@ -138,6 +148,13 @@
   var watchdog = null;
   var _lastRelogin = 0;   // ★ shell-relogin 冷卻（見下方 message 處理）
   var _netTry = 0;        // ★ 連線重試次數（見 load 的 catch）
+
+  // ★2026/09/21　睡醒重載用的兩個變數。
+  //   WAKE_MS：離開多久才算「睡過一覺」，短暫切出去不算。
+  //   ⚠ 測試的時候把它改成 20000（20 秒），驗完務必改回 10 * 60 * 1000。
+  var WAKE_MS = 10 * 60 * 1000;
+  var _hidAt  = 0;
+
   function load(url){
     var want   = url || outerGo();
     var target = want ? safeUrl(want) : (PUNCH + '?page=' + encodeURIComponent(outerPage()));
@@ -196,6 +213,32 @@
     setTimeout(function(){ veil.classList.add('hide'); }, 350);
   });
 
+  // ── ★2026/09/21　睡醒重載 ──────────────────────────────────
+  //   為什麼一定要在【殼】這層做：
+  //     iOS 喚醒被凍結的分頁時，是照著 iframe 現有的 src 重新載入一次。
+  //     那個 src 上的 rc 早就燒掉了（J），而殼的 JS 沒有重跑，
+  //     所以沒有任何人會去拿新的碼 —— 只能等內層撞牆才補救，那太晚了。
+  //   這兩個事件就算 JS 被凍結，解凍後還是會送到，是殼唯一的醒來訊號。
+  function wake(){
+    if (!_hidAt) return;
+    var away = Date.now() - _hidAt;
+    _hidAt = 0;
+    if (away < WAKE_MS) return;              // ⚠ 切出去看個訊息就回來 → 不動它。
+                                             //   現場填到一半的發料登記不能被洗掉。
+    if (!getCk('WZ_TOKEN_CK')) return;       // ⚠ 沒有第一方 cookie 就不要碰。
+                                             //   不然 cookie 過期但內層還活著的人，
+                                             //   會被我們從「還能用」打成「尚未登入」—— 那是新病。
+    _lastRelogin = Date.now();               // ★ 剛注完新碼，壓住內層 30 秒內的 shell-relogin
+    _netTry = 0;
+    load();                                  // 不帶參數 → 從網址列重新推導，就是目前這一頁
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) _hidAt = Date.now(); else wake();
+  });
+  window.addEventListener('pageshow', function(ev){
+    if (ev && ev.persisted) wake();          // 從 bfcache 還原：一定先 hidden 過，_hidAt 有值
+  });
+
   // ── 內層喊話 ────────────────────────────────────────────────
   window.addEventListener('message', function(ev){
     var o = ev.origin || '';
@@ -222,6 +265,7 @@
     //   ⚠ 一定要有冷卻：殼重載 → 內層還是沒票 → 又喊 → 無限迴圈。
     //     30 秒內只受理一次；冷卻中不理會，內層就照原流程去跳登入牆。
     //   ⚠ 不要回 ack —— wzGo 在等 shell-ack，回了會讓它誤判。
+    //   ★2026/09/21 起這條變成【第二道】：正常情況 wake() 已經先補好票了。
     if (d.wz === 'shell-relogin'){
       var _nowT = Date.now();
       if (_nowT - _lastRelogin < 30000) return;
