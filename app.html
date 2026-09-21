@@ -25,6 +25,9 @@
     font-family:-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;
     transition:opacity .4s ease;padding:24px;text-align:center}
   #veil.hide{opacity:0;pointer-events:none}
+  /* ★2026/09/21 v6i　淡出之後整層拿掉，不靠動畫。
+     安卓實測：hide 已經掛上（opacity:0），淡出動畫卻停在第一格，畫面一直蓋著。 */
+  #veil.gone{display:none}
   .spin{width:42px;height:42px;border:3px solid #2a2a30;border-top-color:#E30613;
     border-radius:50%;animation:sp .8s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -83,23 +86,26 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   app.html　外殼　v6h　2026/09/21
-   ══ v6h ══ 量測版：邏輯與 v6g 完全相同，只多了逐步記錄（戳章第二行）。
-     起因：安卓打卡卡在開機畫面，但戳章已印「開4.2s」—— 殼下令收起了，畫面卻還在。
-     第二行字母：
+   app.html　外殼　v6i　2026/09/21
+   ══ v6i ══ 開機畫面「收起」不再只靠淡出動畫
+     安卓打卡實測（v6h 記錄）：LSVFlRH · vhsw
+       → 殼下令收起（H），hide 也確實掛上了，畫面卻還蓋著 —— 淡出動畫在那支手機上沒跑完。
+     修法：hideVeil() 淡出 450ms 後，再加 gone（display:none）把整層拿掉。
+       showSplash()/showVeil() 先把 gone 拿掉再顯示；中途又要顯示就取消那個計時。
+   ══ v6h ══ 逐步記錄（戳章第二行）：
        L 開始載入　S 顯示開機畫面　V 驗票成功　T 用交棒　X 驗票連線失敗
-       F 設定 iframe　l iframe 載入事件　p 內層報到　R 判定畫面可用　H 收起開機畫面
+       F 設定 iframe　l iframe 載入事件　p 內層報到　R 判定畫面可用　H 下令收起　Z 整層拿掉
        E 錯誤畫面　N 內層要求換頁　A 內層自帶身分　g/G 內層喊沒票（G=受理）　W 睡醒
-     之後：v 開機畫面狀態（h=已收起 s=開機樣式 w=連線中字樣）　f iframe 載入次數　v/h 頁面可見/隱藏
+     之後：v 狀態（g=已拿掉 h=已淡出 s=開機樣式 w=連線中字樣）　f iframe 載入次數　v/h 頁面可見/隱藏
    其餘註解見 v6g 與專案文件 claude/外殼v6-平板睡醒回人頭頁-2026-09-21.md
    ════════════════════════════════════════════════════════════ */
 (function(){
-  var SHELL_VER = 'v6h';
+  var SHELL_VER = 'v6i';
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   var SHELL_OK = [
-    'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3', // 09-人事管理-考勤薪資系統
-    'AKfycbzSn9xYdkf7bVZIaPe8XtrKMPdsdegPtV3kZZ72QJ44GJE9RHBal29SsE9K7ekREXUwWQ', // 作業中心
-    'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'    // 領料單
+    'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3',
+    'AKfycbzSn9xYdkf7bVZIaPe8XtrKMPdsdegPtV3kZZ72QJ44GJE9RHBal29SsE9K7ekREXUwWQ',
+    'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'
   ];
   var PIN_ID  = 'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB';
   var PIN_URL = 'https://script.google.com/a/macros/winz-tech.com/s/' + PIN_ID + '/exec?page=field-pin';
@@ -114,7 +120,7 @@
   function tr(c){ _trace = (_trace + c).slice(-24); stamp(); }
   function vstate(){
     var c = veil.classList;
-    return (c.contains('hide') ? 'h' : '-') + (c.contains('splash') ? 's' : '-') + (c.contains('slow') ? 'w' : '-');
+    return (c.contains('gone') ? 'g' : '-') + (c.contains('hide') ? 'h' : '-') + (c.contains('splash') ? 's' : '-') + (c.contains('slow') ? 'w' : '-');
   }
   var HANDOFF = '';
   (function(){
@@ -134,8 +140,14 @@
     catch(e){ return ''; }
   }
   var _slowT = null;
+  var _goneT = null;
+  function unGone(){
+    clearTimeout(_goneT);
+    veil.classList.remove('gone');
+  }
   function showSplash(){
     clearTimeout(_slowT);
+    unGone();
     go.classList.remove('on');
     veil.classList.remove('hide', 'slow');
     veil.classList.add('splash');
@@ -144,6 +156,7 @@
   }
   function showVeil(title, detail, btnText, btnHref){
     clearTimeout(_slowT);
+    unGone();
     _awaitFrame = false;
     veil.classList.remove('splash', 'slow');
     spin.style.display = detail ? 'none' : '';
@@ -158,6 +171,12 @@
     clearTimeout(_slowT);
     veil.classList.add('hide');
     tr('H');
+    clearTimeout(_goneT);
+    _goneT = setTimeout(function(){
+      if (!veil.classList.contains('hide')) return;
+      veil.classList.add('gone');
+      tr('Z');
+    }, 450);
   }
   function safeUrl(u){
     u = String(u || '');
