@@ -100,12 +100,18 @@
    其餘註解見 v6g 與專案文件 claude/外殼v6-平板睡醒回人頭頁-2026-09-21.md
    ════════════════════════════════════════════════════════════ */
 (function(){
-  var SHELL_VER = 'v6i';
+  var SHELL_VER = 'v6j';
   var PUNCH = 'https://script.google.com/a/macros/winz-tech.com/s/AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3/exec';
   var SHELL_OK = [
     'AKfycbxUDyY2BWgoYF4fbEOCBMnw-bmz-1KxogCpvtezgZboiuC9S04oHNnhkVPXb3Kg6Gp3',
     'AKfycbzSn9xYdkf7bVZIaPe8XtrKMPdsdegPtV3kZZ72QJ44GJE9RHBal29SsE9K7ekREXUwWQ',
-    'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB'
+    'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB',
+    // ★2026/09/22 v6j　07-申請管理（樣品／耗材／報廢／員工訂購／樣品發料）。
+    //   為了平板的樣品發料：不在白名單 → PIN 選單用 <a target="_top"> 掀殼 →
+    //   「睡醒回人頭頁」失效 → 平板一直停在上一個人的身分。
+    //   ⚠ 副作用：作業中心點這支專案的卡片，也會改成在殼裡開（原本是掀殼）。
+    //   退場：刪掉這一行。
+    'AKfycbzX9x9h4YDdb_fM27X8mmmrr5A6kSngXu1v6W0CJ9_Xfx6YZqwJWn6q91ovaDV5Uw71LQ'
   ];
   var PIN_ID  = 'AKfycbzjZnB5yGU4416GcuR8dpzn0_1SijpF6Aj3o_rTpmPCoa_Sz5ucmb89ulteF8bDwfeB';
   var PIN_URL = 'https://script.google.com/a/macros/winz-tech.com/s/' + PIN_ID + '/exec?page=field-pin';
